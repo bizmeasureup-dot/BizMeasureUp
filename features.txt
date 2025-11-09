@@ -14,23 +14,36 @@ Technology Stack: React 18 + TypeScript + Vite + Supabase + Tailwind CSS
     - Email/Password login
     - User registration (Sign Up)
     - Password recovery (Forgot Password)
+    - Password reset page (ResetPassword.tsx)
     - Secure session management
     - Automatic session persistence
     - Session timeout handling
 
 1.2 User Profiles
     - User profile management
+    - Profile page (Profile.tsx)
     - Full name and email storage
     - Avatar URL support
+    - Avatar file upload to Supabase Storage
+    - Image preview before upload
+    - File validation (image types, size limits)
     - User role assignment
     - Profile creation on signup
+    - Settings page (Settings.tsx)
+    - Theme preferences management
 
 1.3 Organization Management
     - Multi-organization support
     - Organization creation
     - Organization membership
     - Organization-based data isolation
-    - Organization member management
+    - Organization Settings page (OrganizationSettings.tsx)
+    - Organization CRUD operations
+    - Team Management page (TeamManagement.tsx)
+    - Invite team members
+    - Remove team members
+    - Change member roles
+    - View team member list
 
 1.4 User Roles
     - Admin role (full access)
@@ -64,6 +77,11 @@ Technology Stack: React 18 + TypeScript + Vite + Supabase + Tailwind CSS
     - Live dashboard updates via Supabase Realtime
     - Automatic refresh on task changes
     - No manual refresh required
+
+2.5 Dashboard Visualizations
+    - Task completion chart
+    - Visual representation of task statistics
+    - Chart.js integration for data visualization
 
 ================================================================================
 3. TASK/DELEGATION MANAGEMENT
@@ -152,8 +170,12 @@ Technology Stack: React 18 + TypeScript + Vite + Supabase + Tailwind CSS
     - Add checklist items
     - Item title
     - Item ordering (order_index)
+    - Drag-and-drop reordering of items
+    - Visual drag handle for reordering
     - Multiple items per checklist
     - Dynamic item addition
+    - Edit checklist items
+    - Delete checklist items
 
 4.3 Checklist Completion
     - Mark items as complete/incomplete
@@ -178,6 +200,11 @@ Technology Stack: React 18 + TypeScript + Vite + Supabase + Tailwind CSS
     - Task association display
     - Checklist items list
     - Completion status per item
+
+4.7 Checklist Management
+    - Edit checklist title and description
+    - Delete checklists
+    - Permission-based checklist operations
 
 ================================================================================
 5. SCOREBOARD & METRICS
@@ -216,8 +243,17 @@ Technology Stack: React 18 + TypeScript + Vite + Supabase + Tailwind CSS
 5.5 Metric Management
     - Create new metrics
     - View all metrics
+    - Edit existing metrics
+    - Delete metrics
     - Metric configuration
     - Permission-based metric creation
+    - Automatic metric value updates based on type
+
+5.6 Metric Visualization
+    - Metric trend charts
+    - Task completion charts
+    - Visual data representation
+    - Chart.js integration
 
 ================================================================================
 6. FLOW MANAGEMENT SYSTEM (FMS)
@@ -226,11 +262,13 @@ Technology Stack: React 18 + TypeScript + Vite + Supabase + Tailwind CSS
 6.1 Kanban View
     - Column-based task organization
     - Status columns: Pending, In Progress, Completed, Cancelled
-    - Drag-and-drop ready structure
+    - Drag-and-drop task reordering between columns
+    - Visual feedback during drag operations
     - Task cards in columns
     - Status-based task grouping
     - Quick status updates from Kanban
     - Task count per column
+    - Automatic status update on drag-and-drop
 
 6.2 List View
     - Traditional list display
@@ -274,6 +312,14 @@ Technology Stack: React 18 + TypeScript + Vite + Supabase + Tailwind CSS
     - Filter tasks by date
     - Date range filtering
     - Calendar-based selection
+
+6.8 Flow Views Management
+    - Create saved flow views
+    - Edit flow views
+    - Delete flow views
+    - Load saved flow views
+    - Manage filter configurations
+    - Custom view presets
 
 ================================================================================
 7. ROLE-BASED ACCESS CONTROL (RBAC)
@@ -519,12 +565,17 @@ Technology Stack: React 18 + TypeScript + Vite + Supabase + Tailwind CSS
     - Supabase Auth integration
     - Supabase Database integration
     - Supabase Realtime integration
-    - Supabase Storage (ready for use)
+    - Supabase Storage integration (avatars bucket)
+    - File upload to Supabase Storage
+    - Public URL generation for uploaded files
     - API client configuration
 
 12.2 Third-party Libraries
-    - Chart.js integration (for future charts)
+    - Chart.js integration (implemented)
     - React Chart.js 2 (chart components)
+    - @dnd-kit/core (drag-and-drop functionality)
+    - @dnd-kit/sortable (sortable lists)
+    - @dnd-kit/utilities (drag-and-drop utilities)
     - Windmill React UI components
     - Tailwind CSS styling
 
@@ -538,14 +589,17 @@ Total Major Features: 100+
 Key Highlights:
 - Complete task management system with CRUD operations
 - Multi-view flow management (Kanban, List, Calendar, Gantt)
-- Comprehensive checklist system with progress tracking
-- Performance metrics and scoreboard
+- Drag-and-drop functionality in Kanban and Checklist items
+- Comprehensive checklist system with progress tracking and reordering
+- Performance metrics and scoreboard with charts
 - Role-based access control with 4 user roles
 - Real-time updates via Supabase
+- Avatar upload functionality with file storage
 - Dark/Light theme support
 - Responsive design for all devices
 - Secure authentication and authorization
 - Modern React + TypeScript architecture
+- Chart visualizations for data insights
 
 ================================================================================
 End of Features List
