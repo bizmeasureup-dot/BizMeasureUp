@@ -1,0 +1,176 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
+import Layout from '@/containers/Layout'
+import ProtectedRoute from './ProtectedRoute'
+
+// Auth pages
+import LoginPage from '@/pages/auth/Login'
+import SignUpPage from '@/pages/auth/SignUp'
+import ForgotPasswordPage from '@/pages/auth/ForgotPassword'
+
+// Dashboard
+import DashboardPage from '@/pages/Dashboard'
+
+// Delegation module
+import TasksPage from '@/pages/delegation/Tasks'
+import TaskDetailPage from '@/pages/delegation/TaskDetail'
+import CreateTaskPage from '@/pages/delegation/CreateTask'
+import EditTaskPage from '@/pages/delegation/EditTask'
+
+// Checklist module
+import ChecklistsPage from '@/pages/checklists/Checklists'
+import ChecklistDetailPage from '@/pages/checklists/ChecklistDetail'
+
+// Scoreboard module
+import ScoreboardPage from '@/pages/scoreboard/Scoreboard'
+import MetricConfigPage from '@/pages/scoreboard/MetricConfig'
+
+// FMS module
+import FMSPage from '@/pages/fms/FMS'
+
+function AppRoutes() {
+  const { user, loading } = useAuth()
+
+  // Show loading only on initial load, not on every route change
+  if (loading && !user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="text-lg text-gray-600 dark:text-gray-400">Loading...</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <Routes>
+      {/* Public routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      
+      {/* Protected routes */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <DashboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Delegation routes */}
+      <Route
+        path="/delegation/tasks"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TasksPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/delegation/tasks/new"
+        element={
+          <ProtectedRoute requiredPermission="tasks.create">
+            <Layout>
+              <CreateTaskPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/delegation/tasks/:id"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TaskDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/delegation/tasks/:id/edit"
+        element={
+          <ProtectedRoute requiredPermission="tasks.edit">
+            <Layout>
+              <EditTaskPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Checklist routes */}
+      <Route
+        path="/checklists"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ChecklistsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/checklists/:taskId"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ChecklistDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Scoreboard routes */}
+      <Route
+        path="/scoreboard"
+        element={
+          <ProtectedRoute requiredPermission="metrics.view">
+            <Layout>
+              <ScoreboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/scoreboard/metrics/new"
+        element={
+          <ProtectedRoute requiredPermission="metrics.create">
+            <Layout>
+              <MetricConfigPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* FMS routes */}
+      <Route
+        path="/fms"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <FMSPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Catch all - redirect based on auth status */}
+      <Route 
+        path="*" 
+        element={
+          <ProtectedRoute>
+            <Navigate to="/" replace />
+          </ProtectedRoute>
+        } 
+      />
+    </Routes>
+  )
+}
+
+export default AppRoutes
+
