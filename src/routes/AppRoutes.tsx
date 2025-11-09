@@ -15,7 +15,6 @@ import DashboardPage from '@/pages/Dashboard'
 // Delegation module
 import TasksPage from '@/pages/delegation/Tasks'
 import TaskDetailPage from '@/pages/delegation/TaskDetail'
-import CreateTaskPage from '@/pages/delegation/CreateTask'
 import EditTaskPage from '@/pages/delegation/EditTask'
 
 // Checklist module
@@ -82,16 +81,6 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <TasksPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/delegation/tasks/new"
-        element={
-          <ProtectedRoute requiredPermission="tasks.create">
-            <Layout>
-              <CreateTaskPage />
             </Layout>
           </ProtectedRoute>
         }

@@ -43,6 +43,9 @@ export interface Task {
   priority: TaskPriority
   due_date?: string
   completed_at?: string
+  attachment_required: boolean
+  completion_attachment_url?: string
+  completion_notes?: string
   created_at: string
   updated_at: string
 }

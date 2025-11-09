@@ -174,10 +174,7 @@ function DashboardPage() {
       </Card>
 
       <div className="flex gap-4">
-        <Button onClick={() => navigate('/delegation/tasks/new')}>Create New Task</Button>
-        <Button layout="outline" onClick={() => navigate('/delegation/tasks')}>
-          View All Tasks
-        </Button>
+        <Button onClick={() => navigate('/delegation/tasks')}>View All Tasks</Button>
       </div>
     </div>
   )

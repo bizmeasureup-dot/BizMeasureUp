@@ -52,6 +52,9 @@ CREATE TABLE public.tasks (
   priority task_priority NOT NULL DEFAULT 'medium',
   due_date TIMESTAMP WITH TIME ZONE,
   completed_at TIMESTAMP WITH TIME ZONE,
+  attachment_required BOOLEAN NOT NULL DEFAULT FALSE,
+  completion_attachment_url TEXT,
+  completion_notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );

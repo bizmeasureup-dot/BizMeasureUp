@@ -1,28 +1,66 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useTasks } from '@/hooks/useTasks'
 import { useToastContext } from '@/context/ToastContext'
-import { Task } from '@/types'
+import { supabase } from '@/lib/supabase'
+import { Task, User } from '@/types'
 import { Button, Card, Badge, Input } from '@roketid/windmill-react-ui'
 import PageTitle from '@/components/Typography/PageTitle'
 import { TaskCardSkeleton } from '@/components/LoadingSkeleton'
 import Pagination from '@/components/Pagination'
+import CreateTaskModal from '@/components/CreateTaskModal'
+import EditTaskModal from '@/components/EditTaskModal'
+import CompleteTaskModal from '@/components/CompleteTaskModal'
+import { motion, AnimatePresence } from 'framer-motion'
+import { hasPermission } from '@/lib/rbac'
 
 function TasksPage() {
   const { organization, appUser } = useAuth()
-  const navigate = useNavigate()
   const toast = useToastContext()
   const [filter, setFilter] = useState<'all' | 'assigned' | 'created'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [completingTask, setCompletingTask] = useState<Task | null>(null)
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
+  const [usersMap, setUsersMap] = useState<Record<string, User>>({})
   const itemsPerPage = 10
 
-  const { tasks, loading, error } = useTasks(
+  const { tasks, loading, error, refetch } = useTasks(
     organization?.id || null,
     filter,
     appUser?.id
   )
+
+  // Fetch users when tasks change
+  useEffect(() => {
+    if (tasks.length > 0) {
+      fetchUsersForTasks()
+    }
+  }, [tasks])
+
+  const fetchUsersForTasks = async () => {
+    try {
+      const userIds = [...new Set(tasks.map(t => t.assigned_to).filter(Boolean))]
+      if (userIds.length === 0) return
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', userIds)
+
+      if (error) throw error
+      
+      const map: Record<string, User> = {}
+      data?.forEach(user => {
+        map[user.id] = user
+      })
+      setUsersMap(map)
+    } catch (error) {
+      console.error('Error fetching users for tasks:', error)
+    }
+  }
 
   // Filter tasks by search query
   const filteredTasks = tasks.filter(
@@ -68,12 +106,98 @@ function TasksPage() {
     }
   }
 
+  const toggleExpanded = (taskId: string) => {
+    setExpandedTaskId(expandedTaskId === taskId ? null : taskId)
+  }
+
+  const updateTaskStatus = async (taskId: string, newStatus: Task['status']) => {
+    // If marking as completed, use the CompleteTaskModal instead
+    if (newStatus === 'completed') {
+      const task = tasks.find(t => t.id === taskId)
+      if (task) {
+        setCompletingTask(task)
+        return
+      }
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ 
+          status: newStatus, 
+          ...(newStatus === 'completed' ? { completed_at: new Date().toISOString() } : {}) 
+        })
+        .eq('id', taskId)
+
+      if (error) throw error
+      toast.success('Task status updated')
+      refetch()
+    } catch (error: any) {
+      console.error('Error updating task:', error)
+      toast.error(error.message || 'Failed to update task status')
+    }
+  }
+
+  const deleteTask = async (taskId: string) => {
+    if (!window.confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId)
+
+      if (error) throw error
+      toast.success('Task deleted successfully')
+      if (expandedTaskId === taskId) {
+        setExpandedTaskId(null)
+      }
+      refetch()
+    } catch (error: any) {
+      console.error('Error deleting task:', error)
+      toast.error(error.message || 'Failed to delete task')
+    }
+  }
+
+  const getAssignedUserName = (userId: string) => {
+    const user = usersMap[userId]
+    return user ? (user.full_name || user.email) : 'Unknown'
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <PageTitle>Tasks</PageTitle>
-        <Button onClick={() => navigate('/delegation/tasks/new')}>Create Task</Button>
+        <Button onClick={() => setIsCreateModalOpen(true)}>Create Task</Button>
       </div>
+
+      <CreateTaskModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          refetch()
+        }}
+      />
+
+      <EditTaskModal
+        isOpen={editingTaskId !== null}
+        onClose={() => setEditingTaskId(null)}
+        onSuccess={() => {
+          refetch()
+        }}
+        taskId={editingTaskId}
+      />
+
+      <CompleteTaskModal
+        isOpen={completingTask !== null}
+        onClose={() => setCompletingTask(null)}
+        onSuccess={() => {
+          refetch()
+        }}
+        task={completingTask}
+      />
 
       <div className="mb-4 flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
@@ -134,39 +258,212 @@ function TasksPage() {
         </Card>
       ) : (
         <>
-          <div className="grid gap-4">
-            {paginatedTasks.map((task) => (
-            <Card
-              key={task.id}
-              className="cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => navigate(`/delegation/tasks/${task.id}`)}
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                      {task.title}
-                    </h3>
-                    {task.description && (
-                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        {task.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    <Badge type={getStatusColor(task.status)}>{task.status}</Badge>
-                    <Badge type={getPriorityColor(task.priority)}>{task.priority}</Badge>
-                  </div>
-                </div>
-                {task.due_date && (
-                  <p className="mt-4 text-sm text-gray-500">
-                    Due: {new Date(task.due_date).toLocaleDateString()}
-                  </p>
-                )}
-              </div>
-            </Card>
-            ))}
-          </div>
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full whitespace-nowrap">
+                <thead>
+                  <tr className="text-xs font-semibold tracking-wide text-left text-gray-500 uppercase border-b dark:border-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-800">
+                    <th className="px-4 py-3">Title</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 hidden md:table-cell">Priority</th>
+                    <th className="px-4 py-3 hidden lg:table-cell">Assigned To</th>
+                    <th className="px-4 py-3 hidden lg:table-cell">Due Date</th>
+                    <th className="px-4 py-3 hidden xl:table-cell">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y dark:divide-gray-700 dark:bg-gray-800">
+                  {paginatedTasks.map((task) => {
+                    const isExpanded = expandedTaskId === task.id
+                    const canEdit = appUser && (hasPermission(appUser.role, 'tasks.edit') || task.assigned_to === appUser.id)
+                    const canDelete = appUser && hasPermission(appUser.role, 'tasks.delete')
+                    
+                    return (
+                      <React.Fragment key={task.id}>
+                        <tr
+                          className="text-gray-700 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          onClick={() => toggleExpanded(task.id)}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <svg
+                                className={`w-4 h-4 mr-2 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
+                                fill="none"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path d="M9 5l7 7-7 7" />
+                              </svg>
+                              <span className="font-medium">{task.title}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge type={getStatusColor(task.status)}>{task.status}</Badge>
+                          </td>
+                          <td className="px-4 py-3 hidden md:table-cell">
+                            <Badge type={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm hidden lg:table-cell">
+                            {getAssignedUserName(task.assigned_to)}
+                          </td>
+                          <td className="px-4 py-3 text-sm hidden lg:table-cell">
+                            {task.due_date ? new Date(task.due_date).toLocaleDateString() : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm hidden xl:table-cell">
+                            {new Date(task.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={6} className="bg-gray-50 dark:bg-gray-900 p-0 border-l-2 border-blue-200 dark:border-blue-800">
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="px-4 py-2.5 max-h-[300px] overflow-y-auto space-y-2">
+                                    {task.description && (
+                                      <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{task.description}</p>
+                                    )}
+
+                                    <div className="grid grid-cols-3 gap-x-4 gap-y-1.5">
+                                      {task.due_date && (
+                                        <div>
+                                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Due Date</span>
+                                          <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">
+                                            {new Date(task.due_date).toLocaleString()}
+                                          </p>
+                                        </div>
+                                      )}
+                                      
+                                      {task.completed_at && (
+                                        <div>
+                                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Completed At</span>
+                                          <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">
+                                            {new Date(task.completed_at).toLocaleString()}
+                                          </p>
+                                        </div>
+                                      )}
+
+                                      <div>
+                                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Created At</span>
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">
+                                          {new Date(task.created_at).toLocaleString()}
+                                        </p>
+                                      </div>
+
+                                      <div>
+                                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Assigned To</span>
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">
+                                          {getAssignedUserName(task.assigned_to)}
+                                        </p>
+                                      </div>
+
+                                      {task.status === 'completed' && task.completion_notes && (
+                                        <div>
+                                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Completion Notes</span>
+                                          <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5 whitespace-pre-wrap">{task.completion_notes}</p>
+                                        </div>
+                                      )}
+
+                                      {task.status === 'completed' && task.completion_attachment_url && (
+                                        <div>
+                                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Completion Attachment</span>
+                                          <a
+                                            href={task.completion_attachment_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 mt-0.5"
+                                          >
+                                            <svg
+                                              className="w-3.5 h-3.5"
+                                              fill="none"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth="2"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                            >
+                                              <path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                            </svg>
+                                            View Attachment
+                                          </a>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-gray-800 justify-end">
+                                    {canEdit && task.status !== 'completed' && (
+                                      <>
+                                        {task.status === 'pending' && (
+                                          <Button 
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              updateTaskStatus(task.id, 'in_progress')
+                                            }}
+                                          >
+                                            Start Task
+                                          </Button>
+                                        )}
+                                        {task.status === 'in_progress' && (
+                                          <Button 
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              updateTaskStatus(task.id, 'completed')
+                                            }}
+                                          >
+                                            Mark Complete
+                                          </Button>
+                                        )}
+                                      </>
+                                    )}
+                                    
+                                    {canEdit && (
+                                      <Button 
+                                        size="small"
+                                        layout="outline"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setEditingTaskId(task.id)
+                                        }}
+                                      >
+                                        Edit Task
+                                      </Button>
+                                    )}
+                                    
+                                    {canDelete && (
+                                      <Button 
+                                        size="small"
+                                        layout="outline"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          deleteTask(task.id)
+                                        }}
+                                      >
+                                        Delete Task
+                                      </Button>
+                                    )}
+                                  </div>
+                                  </div>
+                                </motion.div>
+                              </td>
+                            </tr>
+                          )}
+                        </AnimatePresence>
+                      </React.Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}

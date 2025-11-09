@@ -32,19 +32,9 @@ const routes: IRoute[] = [
     exact: true,
   },
   {
-    path: '/delegation',
+    path: '/delegation/tasks',
     icon: 'FormsIcon',
     name: 'Delegation',
-    routes: [
-      {
-        path: '/delegation/tasks',
-        name: 'All Tasks',
-      },
-      {
-        path: '/delegation/tasks/new',
-        name: 'Create Task',
-      },
-    ],
   },
   {
     path: '/checklists',

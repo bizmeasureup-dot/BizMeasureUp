@@ -79,7 +79,6 @@ export function canAccessRoute(role: UserRole, route: string): boolean {
   // Define route access rules
   const routePermissions: Record<string, Permission[]> = {
     '/delegation': ['tasks.view_all', 'tasks.view_assigned'],
-    '/delegation/tasks/new': ['tasks.create'],
     '/checklists': ['checklists.view'],
     '/scoreboard': ['metrics.view'],
     '/fms': ['flow_views.create'],
