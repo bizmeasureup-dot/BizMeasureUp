@@ -8,6 +8,9 @@ import { Button, Card, Badge, Select } from '@roketid/windmill-react-ui'
 import PageTitle from '@/components/Typography/PageTitle'
 import { hasPermission } from '@/lib/rbac'
 import { CardSkeleton } from '@/components/LoadingSkeleton'
+import TaskActionsButton from '@/components/TaskActionsButton'
+import RescheduleTaskModal from '@/components/RescheduleTaskModal'
+import CompleteTaskModal from '@/components/CompleteTaskModal'
 
 function TaskDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -18,6 +21,8 @@ function TaskDetailPage() {
   const [assignedUser, setAssignedUser] = useState<User | null>(null)
   const [availableUsers, setAvailableUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -88,10 +93,16 @@ function TaskDetailPage() {
   const updateTaskStatus = async (newStatus: Task['status']) => {
     if (!task || !id) return
 
+    // If marking as completed, use the CompleteTaskModal instead
+    if (newStatus === 'completed') {
+      setIsCompleteModalOpen(true)
+      return
+    }
+
     try {
       const { error } = await supabase
         .from('tasks')
-        .update({ status: newStatus, ...(newStatus === 'completed' ? { completed_at: new Date().toISOString() } : {}) })
+        .update({ status: newStatus })
         .eq('id', id)
 
       if (error) throw error
@@ -160,19 +171,9 @@ function TaskDetailPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <PageTitle>{task.title}</PageTitle>
-        <div className="flex gap-2">
-          {canEdit && (
-            <Button onClick={() => navigate(`/delegation/tasks/${id}/edit`)}>Edit Task</Button>
-          )}
-          {canDelete && (
-            <Button layout="outline" onClick={deleteTask}>
-              Delete Task
-            </Button>
-          )}
-        </div>
       </div>
 
-      <Card className="mb-6">
+      <Card className="mb-6 relative">
         <div className="p-6">
           <div className="flex gap-4 mb-4">
             <Badge type={task.status === 'completed' ? 'success' : task.status === 'in_progress' ? 'primary' : 'warning'}>
@@ -214,15 +215,17 @@ function TaskDetailPage() {
             </div>
           )}
 
-          {canEdit && task.status !== 'completed' && (
-            <div className="mt-6 flex gap-2">
-              {task.status === 'pending' && (
-                <Button onClick={() => updateTaskStatus('in_progress')}>Start Task</Button>
-              )}
-              {task.status === 'in_progress' && (
-                <Button onClick={() => updateTaskStatus('completed')}>Mark Complete</Button>
-              )}
-            </div>
+          {(canEdit || canDelete) && (
+            <TaskActionsButton
+              task={task}
+              onStartTask={canEdit && task.status === 'pending' ? () => updateTaskStatus('in_progress') : undefined}
+              onMarkComplete={canEdit && task.status === 'in_progress' ? () => updateTaskStatus('completed') : undefined}
+              onReschedule={canEdit ? () => setIsRescheduleModalOpen(true) : undefined}
+              onEdit={canEdit ? () => navigate(`/delegation/tasks/${id}/edit`) : undefined}
+              onDelete={canDelete ? deleteTask : undefined}
+              position="bottom-right"
+              size="regular"
+            />
           )}
         </div>
       </Card>
@@ -230,6 +233,24 @@ function TaskDetailPage() {
       <Button layout="outline" onClick={() => navigate('/delegation/tasks')}>
         Back to Tasks
       </Button>
+
+      <RescheduleTaskModal
+        isOpen={isRescheduleModalOpen}
+        onClose={() => setIsRescheduleModalOpen(false)}
+        onSuccess={() => {
+          fetchTask()
+        }}
+        task={task}
+      />
+
+      <CompleteTaskModal
+        isOpen={isCompleteModalOpen}
+        onClose={() => setIsCompleteModalOpen(false)}
+        onSuccess={() => {
+          fetchTask()
+        }}
+        task={task}
+      />
     </div>
   )
 }

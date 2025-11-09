@@ -11,6 +11,8 @@ import Pagination from '@/components/Pagination'
 import CreateTaskModal from '@/components/CreateTaskModal'
 import EditTaskModal from '@/components/EditTaskModal'
 import CompleteTaskModal from '@/components/CompleteTaskModal'
+import TaskActionsButton from '@/components/TaskActionsButton'
+import RescheduleTaskModal from '@/components/RescheduleTaskModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import { hasPermission } from '@/lib/rbac'
 
@@ -23,6 +25,7 @@ function TasksPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [completingTask, setCompletingTask] = useState<Task | null>(null)
+  const [reschedulingTask, setReschedulingTask] = useState<Task | null>(null)
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [usersMap, setUsersMap] = useState<Record<string, User>>({})
   const itemsPerPage = 10
@@ -199,6 +202,15 @@ function TasksPage() {
         task={completingTask}
       />
 
+      <RescheduleTaskModal
+        isOpen={reschedulingTask !== null}
+        onClose={() => setReschedulingTask(null)}
+        onSuccess={() => {
+          refetch()
+        }}
+        task={reschedulingTask}
+      />
+
       <div className="mb-4 flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <Input
@@ -268,7 +280,7 @@ function TasksPage() {
                     <th className="px-4 py-3 hidden md:table-cell">Priority</th>
                     <th className="px-4 py-3 hidden lg:table-cell">Assigned To</th>
                     <th className="px-4 py-3 hidden lg:table-cell">Due Date</th>
-                    <th className="px-4 py-3 hidden xl:table-cell">Created</th>
+                    <th className="px-4 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y dark:divide-gray-700 dark:bg-gray-800">
@@ -281,7 +293,14 @@ function TasksPage() {
                       <React.Fragment key={task.id}>
                         <tr
                           className="text-gray-700 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                          onClick={() => toggleExpanded(task.id)}
+                          onClick={(e) => {
+                            // Don't expand if clicking on Actions button
+                            const target = e.target as HTMLElement
+                            if (target.closest('[data-actions-button]')) {
+                              return
+                            }
+                            toggleExpanded(task.id)
+                          }}
                         >
                           <td className="px-4 py-3">
                             <div className="flex items-center">
@@ -311,8 +330,33 @@ function TasksPage() {
                           <td className="px-4 py-3 text-sm hidden lg:table-cell">
                             {task.due_date ? new Date(task.due_date).toLocaleDateString() : '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm hidden xl:table-cell">
-                            {new Date(task.created_at).toLocaleDateString()}
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            {(canEdit || canDelete) && (
+                              <div data-actions-button onClick={(e) => e.stopPropagation()}>
+                                <TaskActionsButton
+                                  task={task}
+                                  onStartTask={canEdit && task.status === 'pending' ? () => updateTaskStatus(task.id, 'in_progress') : undefined}
+                                  onMarkComplete={canEdit && task.status === 'in_progress' ? () => {
+                                    const taskToComplete = tasks.find(t => t.id === task.id)
+                                    if (taskToComplete) {
+                                      setCompletingTask(taskToComplete)
+                                    }
+                                  } : undefined}
+                                  onReschedule={canEdit ? () => {
+                                    const taskToReschedule = tasks.find(t => t.id === task.id)
+                                    if (taskToReschedule) {
+                                      setReschedulingTask(taskToReschedule)
+                                    }
+                                  } : undefined}
+                                  onEdit={canEdit ? () => {
+                                    setEditingTaskId(task.id)
+                                  } : undefined}
+                                  onDelete={canDelete ? () => {
+                                    deleteTask(task.id)
+                                  } : undefined}
+                                />
+                              </div>
+                            )}
                           </td>
                         </tr>
                         <AnimatePresence>
@@ -397,60 +441,9 @@ function TasksPage() {
                                       )}
                                     </div>
 
-                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-gray-800 justify-end">
-                                    {canEdit && task.status !== 'completed' && (
-                                      <>
-                                        {task.status === 'pending' && (
-                                          <Button 
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              updateTaskStatus(task.id, 'in_progress')
-                                            }}
-                                          >
-                                            Start Task
-                                          </Button>
-                                        )}
-                                        {task.status === 'in_progress' && (
-                                          <Button 
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              updateTaskStatus(task.id, 'completed')
-                                            }}
-                                          >
-                                            Mark Complete
-                                          </Button>
-                                        )}
-                                      </>
-                                    )}
-                                    
-                                    {canEdit && (
-                                      <Button 
-                                        size="small"
-                                        layout="outline"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setEditingTaskId(task.id)
-                                        }}
-                                      >
-                                        Edit Task
-                                      </Button>
-                                    )}
-                                    
-                                    {canDelete && (
-                                      <Button 
-                                        size="small"
-                                        layout="outline"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          deleteTask(task.id)
-                                        }}
-                                      >
-                                        Delete Task
-                                      </Button>
-                                    )}
-                                  </div>
+                                    <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                                      {/* Additional task details can go here if needed */}
+                                    </div>
                                   </div>
                                 </motion.div>
                               </td>

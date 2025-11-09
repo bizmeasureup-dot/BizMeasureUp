@@ -2,7 +2,8 @@ import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Task, TaskStatus } from '@/types'
-import { Card, Badge, Button } from '@roketid/windmill-react-ui'
+import { Card, Badge } from '@roketid/windmill-react-ui'
+import TaskActionsButton from './TaskActionsButton'
 
 interface SortableTaskCardProps {
   task: Task
@@ -10,6 +11,7 @@ interface SortableTaskCardProps {
   onNavigate: (taskId: string) => void
   onStatusUpdate: (taskId: string, newStatus: TaskStatus) => void
   getStatusColor: (status: string) => 'success' | 'primary' | 'danger' | 'warning'
+  onReschedule?: () => void
 }
 
 function SortableTaskCard({
@@ -18,6 +20,7 @@ function SortableTaskCard({
   onNavigate,
   onStatusUpdate,
   getStatusColor,
+  onReschedule,
 }: SortableTaskCardProps) {
   const {
     attributes,
@@ -52,28 +55,12 @@ function SortableTaskCard({
         )}
         {status !== 'completed' && status !== 'cancelled' && (
           <div className="mt-2 flex gap-1">
-            {status === 'pending' && (
-              <Button
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onStatusUpdate(task.id, 'in_progress')
-                }}
-              >
-                Start
-              </Button>
-            )}
-            {status === 'in_progress' && (
-              <Button
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onStatusUpdate(task.id, 'completed')
-                }}
-              >
-                Complete
-              </Button>
-            )}
+            <TaskActionsButton
+              task={task}
+              onStartTask={() => onStatusUpdate(task.id, 'in_progress')}
+              onMarkComplete={() => onStatusUpdate(task.id, 'completed')}
+              onReschedule={onReschedule}
+            />
           </div>
         )}
       </Card>

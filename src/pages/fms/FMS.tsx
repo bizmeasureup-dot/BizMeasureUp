@@ -9,6 +9,7 @@ import PageTitle from '@/components/Typography/PageTitle'
 import { TaskCardSkeleton } from '@/components/LoadingSkeleton'
 import SortableTaskCard from '@/components/SortableTaskCard'
 import DroppableColumn from '@/components/DroppableColumn'
+import RescheduleTaskModal from '@/components/RescheduleTaskModal'
 import {
   DndContext,
   DragOverlay,
@@ -32,6 +33,7 @@ function FMSPage() {
   const [viewType, setViewType] = useState<FlowViewType>('kanban')
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [reschedulingTask, setReschedulingTask] = useState<Task | null>(null)
   const [searchParams] = useSearchParams()
 
   const sensors = useSensors(
@@ -275,6 +277,7 @@ function FMSPage() {
                         onNavigate={(id) => navigate(`/delegation/tasks/${id}`)}
                         onStatusUpdate={updateTaskStatus}
                         getStatusColor={getStatusColor}
+                        onReschedule={() => setReschedulingTask(task)}
                       />
                     ))}
                   </DroppableColumn>
@@ -469,6 +472,15 @@ function FMSPage() {
           ))}
         </div>
       )}
+
+      <RescheduleTaskModal
+        isOpen={reschedulingTask !== null}
+        onClose={() => setReschedulingTask(null)}
+        onSuccess={() => {
+          fetchTasks()
+        }}
+        task={reschedulingTask}
+      />
     </div>
   )
 }
