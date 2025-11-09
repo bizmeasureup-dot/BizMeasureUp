@@ -6,6 +6,7 @@ import { Task } from '@/types'
 import { Button, Card } from '@roketid/windmill-react-ui'
 import PageTitle from '@/components/Typography/PageTitle'
 import { CardSkeleton } from '@/components/LoadingSkeleton'
+import TaskCompletionChart from '@/components/Charts/TaskCompletionChart'
 
 function DashboardPage() {
   const { appUser, organization } = useAuth()
@@ -138,6 +139,15 @@ function DashboardPage() {
           </>
         )}
       </div>
+
+      <Card className="mb-8">
+        <div className="p-6">
+          <h2 className="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-200">Task Status Chart</h2>
+          <div className="h-64 mb-6">
+            <TaskCompletionChart taskStats={stats} />
+          </div>
+        </div>
+      </Card>
 
       <Card className="mb-8">
         <div className="p-6">

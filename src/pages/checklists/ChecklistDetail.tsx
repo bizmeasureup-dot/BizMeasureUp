@@ -5,8 +5,24 @@ import { useToastContext } from '@/context/ToastContext'
 import { supabase } from '@/lib/supabase'
 import { Checklist, ChecklistItem, Task } from '@/types'
 import { Button, Card, Label, Input } from '@roketid/windmill-react-ui'
+import { hasPermission } from '@/lib/rbac'
 import PageTitle from '@/components/Typography/PageTitle'
 import { CardSkeleton } from '@/components/LoadingSkeleton'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import SortableChecklistItem from '@/components/SortableChecklistItem'
 
 function ChecklistDetailPage() {
   const { taskId } = useParams<{ taskId: string }>()
@@ -18,6 +34,18 @@ function ChecklistDetailPage() {
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [newItemTitle, setNewItemTitle] = useState('')
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingItemTitle, setEditingItemTitle] = useState('')
+  const [isEditingChecklist, setIsEditingChecklist] = useState(false)
+  const [checklistTitle, setChecklistTitle] = useState('')
+  const [checklistDescription, setChecklistDescription] = useState('')
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     if (taskId) {
@@ -48,6 +76,8 @@ function ChecklistDetailPage() {
 
       if (checklistData) {
         setChecklist(checklistData)
+        setChecklistTitle(checklistData.title)
+        setChecklistDescription(checklistData.description || '')
         fetchItems(checklistData.id)
       }
     } catch (error: any) {
@@ -146,10 +176,151 @@ function ChecklistDetailPage() {
       if (error) throw error
       toast.success('Checklist created')
       setChecklist(data)
+      setChecklistTitle(data.title)
+      setChecklistDescription(data.description || '')
       fetchItems(data.id)
     } catch (error: any) {
       console.error('Error creating checklist:', error)
       toast.error('Failed to create checklist')
+    }
+  }
+
+  const updateChecklist = async () => {
+    if (!checklist) return
+
+    try {
+      const { error } = await supabase
+        .from('checklists')
+        .update({
+          title: checklistTitle,
+          description: checklistDescription || null,
+        })
+        .eq('id', checklist.id)
+
+      if (error) throw error
+      toast.success('Checklist updated')
+      setIsEditingChecklist(false)
+      fetchChecklist()
+    } catch (error: any) {
+      console.error('Error updating checklist:', error)
+      toast.error('Failed to update checklist')
+    }
+  }
+
+  const deleteChecklist = async () => {
+    if (!checklist || !window.confirm('Are you sure you want to delete this checklist? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('checklists')
+        .delete()
+        .eq('id', checklist.id)
+
+      if (error) throw error
+      toast.success('Checklist deleted')
+      navigate('/checklists')
+    } catch (error: any) {
+      console.error('Error deleting checklist:', error)
+      toast.error('Failed to delete checklist')
+    }
+  }
+
+  const deleteItem = async (itemId: string) => {
+    if (!checklist || !window.confirm('Are you sure you want to delete this item?')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('checklist_items')
+        .delete()
+        .eq('id', itemId)
+
+      if (error) throw error
+      toast.success('Item deleted')
+      fetchItems(checklist.id)
+    } catch (error: any) {
+      console.error('Error deleting item:', error)
+      toast.error('Failed to delete item')
+    }
+  }
+
+  const startEditingItem = (item: ChecklistItem) => {
+    setEditingItemId(item.id)
+    setEditingItemTitle(item.title)
+  }
+
+  const cancelEditingItem = () => {
+    setEditingItemId(null)
+    setEditingItemTitle('')
+  }
+
+  const saveItemEdit = async (itemId: string) => {
+    if (!checklist || !editingItemTitle.trim()) return
+
+    try {
+      const { error } = await supabase
+        .from('checklist_items')
+        .update({ title: editingItemTitle })
+        .eq('id', itemId)
+
+      if (error) throw error
+      toast.success('Item updated')
+      setEditingItemId(null)
+      setEditingItemTitle('')
+      fetchItems(checklist.id)
+    } catch (error: any) {
+      console.error('Error updating item:', error)
+      toast.error('Failed to update item')
+    }
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id || !checklist) {
+      return
+    }
+
+    const oldIndex = items.findIndex((item) => item.id === active.id)
+    const newIndex = items.findIndex((item) => item.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+
+    // Reorder items array
+    const reorderedItems = Array.from(items)
+    const [removed] = reorderedItems.splice(oldIndex, 1)
+    reorderedItems.splice(newIndex, 0, removed)
+
+    // Update order_index for all affected items
+    const updates = reorderedItems.map((item, index) => ({
+      id: item.id,
+      order_index: index,
+    }))
+
+    try {
+      // Update all items in a transaction-like manner
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('checklist_items')
+          .update({ order_index: update.order_index })
+          .eq('id', update.id)
+
+        if (error) throw error
+      }
+
+      // Update local state
+      setItems(reorderedItems)
+      toast.success('Items reordered')
+    } catch (error: any) {
+      console.error('Error reordering items:', error)
+      toast.error('Failed to reorder items')
+      // Refresh items on error
+      fetchItems(checklist.id)
     }
   }
 
@@ -175,7 +346,63 @@ function ChecklistDetailPage() {
         <>
           <Card className="mt-6">
             <div className="p-6">
-              <h2 className="text-lg font-semibold mb-4">{checklist.title}</h2>
+              <div className="flex justify-between items-start mb-4">
+                {isEditingChecklist ? (
+                  <div className="flex-1">
+                    <Label className="mb-2">
+                      <span>Checklist Title</span>
+                      <Input
+                        className="mt-1"
+                        value={checklistTitle}
+                        onChange={(e) => setChecklistTitle(e.target.value)}
+                      />
+                    </Label>
+                    <Label className="mt-4">
+                      <span>Description</span>
+                      <Input
+                        className="mt-1"
+                        tag="textarea"
+                        rows={2}
+                        value={checklistDescription}
+                        onChange={(e) => setChecklistDescription(e.target.value)}
+                      />
+                    </Label>
+                    <div className="flex gap-2 mt-4">
+                      <Button size="small" onClick={updateChecklist}>
+                        Save
+                      </Button>
+                      <Button size="small" layout="outline" onClick={() => {
+                        setIsEditingChecklist(false)
+                        setChecklistTitle(checklist.title)
+                        setChecklistDescription(checklist.description || '')
+                      }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <h2 className="text-lg font-semibold">{checklist.title}</h2>
+                      {checklist.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{checklist.description}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {appUser && hasPermission(appUser.role, 'checklists.edit') && (
+                        <Button size="small" layout="outline" onClick={() => setIsEditingChecklist(true)}>
+                          Edit
+                        </Button>
+                      )}
+                      {appUser && hasPermission(appUser.role, 'checklists.delete') && (
+                        <Button size="small" layout="outline" onClick={deleteChecklist}>
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
               <div className="mb-4">
                 <div className="flex justify-between text-sm mb-2">
                   <span>Progress</span>
@@ -190,21 +417,38 @@ function ChecklistDetailPage() {
               </div>
 
               <div className="space-y-2 mb-4">
-                {items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={item.is_completed}
-                      onChange={() => toggleItem(item.id, item.is_completed)}
-                      className="w-4 h-4 text-purple-600 rounded"
-                    />
-                    <span
-                      className={item.is_completed ? 'line-through text-gray-500' : 'text-gray-700 dark:text-gray-200'}
+                {items.length > 0 ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={items.map((item) => item.id)}
+                      strategy={verticalListSortingStrategy}
                     >
-                      {item.title}
-                    </span>
-                  </div>
-                ))}
+                      {items.map((item) => (
+                        <SortableChecklistItem
+                          key={item.id}
+                          item={item}
+                          isEditing={editingItemId === item.id}
+                          editingTitle={editingItemTitle}
+                          onToggle={toggleItem}
+                          onEdit={() => startEditingItem(item)}
+                          onDelete={deleteItem}
+                          onSaveEdit={saveItemEdit}
+                          onCancelEdit={cancelEditingItem}
+                          onTitleChange={setEditingItemTitle}
+                          canEdit={appUser ? hasPermission(appUser.role, 'checklists.edit') : false}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                    No items yet. Add your first item below.
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2">

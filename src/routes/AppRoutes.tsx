@@ -7,6 +7,7 @@ import ProtectedRoute from './ProtectedRoute'
 import LoginPage from '@/pages/auth/Login'
 import SignUpPage from '@/pages/auth/SignUp'
 import ForgotPasswordPage from '@/pages/auth/ForgotPassword'
+import ResetPasswordPage from '@/pages/auth/ResetPassword'
 
 // Dashboard
 import DashboardPage from '@/pages/Dashboard'
@@ -24,9 +25,21 @@ import ChecklistDetailPage from '@/pages/checklists/ChecklistDetail'
 // Scoreboard module
 import ScoreboardPage from '@/pages/scoreboard/Scoreboard'
 import MetricConfigPage from '@/pages/scoreboard/MetricConfig'
+import EditMetricPage from '@/pages/scoreboard/EditMetric'
 
 // FMS module
 import FMSPage from '@/pages/fms/FMS'
+
+// User pages
+import ProfilePage from '@/pages/Profile'
+import SettingsPage from '@/pages/Settings'
+
+// Organization & Team
+import OrganizationSettingsPage from '@/pages/organization/OrganizationSettings'
+import TeamManagementPage from '@/pages/team/TeamManagement'
+
+// FMS
+import FlowViewsPage from '@/pages/fms/FlowViews'
 
 function AppRoutes() {
   const { user, loading } = useAuth()
@@ -48,6 +61,7 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       
       {/* Protected routes */}
       <Route
@@ -146,6 +160,16 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/scoreboard/metrics/:id/edit"
+        element={
+          <ProtectedRoute requiredPermission="metrics.edit">
+            <Layout>
+              <EditMetricPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* FMS routes */}
       <Route
@@ -154,6 +178,60 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <FMSPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/fms/views"
+        element={
+          <ProtectedRoute requiredPermission="flow_views.create">
+            <Layout>
+              <FlowViewsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* User routes */}
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ProfilePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <SettingsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Organization & Team routes */}
+      <Route
+        path="/organization/settings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <OrganizationSettingsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/team"
+        element={
+          <ProtectedRoute requiredPermission="team.manage">
+            <Layout>
+              <TeamManagementPage />
             </Layout>
           </ProtectedRoute>
         }

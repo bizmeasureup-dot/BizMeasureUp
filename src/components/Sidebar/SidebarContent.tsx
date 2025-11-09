@@ -5,6 +5,7 @@ import { IIcon } from '@/icons'
 import SidebarSubmenu from './SidebarSubmenu'
 import { Button } from '@roketid/windmill-react-ui'
 import { useAuth } from '@/context/AuthContext'
+import { hasPermission } from '@/lib/rbac'
 
 function Icon({ icon, ...props }: IIcon) {
   // @ts-ignore
@@ -22,7 +23,11 @@ function SidebarContent({ linkClicked }: ISidebarContent) {
   const appName = 'BizMeasureUp'
 
   // Filter routes based on user role
-  const visibleRoutes = routes
+  const visibleRoutes = routes.filter((route) => {
+    if (!route.roles || route.roles.length === 0) return true
+    if (!appUser) return false
+    return route.roles.includes(appUser.role)
+  })
 
   return (
     <div className="text-gray-500 dark:text-gray-400">

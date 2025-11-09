@@ -61,6 +61,34 @@ const routes: IRoute[] = [
     icon: 'TablesIcon',
     name: 'Flow Management',
   },
+  {
+    path: '/fms/views',
+    icon: 'CardsIcon',
+    name: 'Flow Views',
+    roles: ['admin', 'owner'],
+  },
+  {
+    path: '/team',
+    icon: 'TablesIcon',
+    name: 'Team Management',
+    roles: ['admin', 'owner'],
+  },
+  {
+    path: '/organization/settings',
+    icon: 'OutlineCogIcon',
+    name: 'Organization',
+    roles: ['admin', 'owner'],
+  },
+  {
+    path: '/profile',
+    icon: 'OutlinePersonIcon',
+    name: 'Profile',
+  },
+  {
+    path: '/settings',
+    icon: 'OutlineCogIcon',
+    name: 'Settings',
+  },
 ]
 
 export type { IRoute }

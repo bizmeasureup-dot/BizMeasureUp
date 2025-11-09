@@ -44,6 +44,9 @@ interface IThemeContext {
 // create context
 export const ThemeContext = React.createContext<IThemeContext>({ theme: '', toggleTheme: () => {} })
 
+// export hook
+export const useTheme = () => React.useContext(ThemeContext)
+
 interface IThemeProvider {
   children: React.ReactNode
 }

@@ -134,14 +134,42 @@ function TaskDetailPage() {
   }
 
   const canEdit = appUser && (hasPermission(appUser.role, 'tasks.edit') || task.assigned_to === appUser.id)
+  const canDelete = appUser && hasPermission(appUser.role, 'tasks.delete')
+
+  const deleteTask = async () => {
+    if (!task || !id || !window.confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      toast.success('Task deleted successfully')
+      navigate('/delegation/tasks')
+    } catch (error: any) {
+      console.error('Error deleting task:', error)
+      toast.error(error.message || 'Failed to delete task')
+    }
+  }
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <PageTitle>{task.title}</PageTitle>
-        {canEdit && (
-          <Button onClick={() => navigate(`/delegation/tasks/${id}/edit`)}>Edit Task</Button>
-        )}
+        <div className="flex gap-2">
+          {canEdit && (
+            <Button onClick={() => navigate(`/delegation/tasks/${id}/edit`)}>Edit Task</Button>
+          )}
+          {canDelete && (
+            <Button layout="outline" onClick={deleteTask}>
+              Delete Task
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card className="mb-6">

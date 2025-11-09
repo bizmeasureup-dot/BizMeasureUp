@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useToastContext } from '@/context/ToastContext'
 import { supabase } from '@/lib/supabase'
@@ -7,6 +7,21 @@ import { Task, TaskStatus, FlowViewType } from '@/types'
 import { Card, Badge, Button } from '@roketid/windmill-react-ui'
 import PageTitle from '@/components/Typography/PageTitle'
 import { TaskCardSkeleton } from '@/components/LoadingSkeleton'
+import SortableTaskCard from '@/components/SortableTaskCard'
+import DroppableColumn from '@/components/DroppableColumn'
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable'
 
 function FMSPage() {
   const { organization, appUser } = useAuth()
@@ -16,10 +31,26 @@ function FMSPage() {
   const [loading, setLoading] = useState(true)
   const [viewType, setViewType] = useState<FlowViewType>('kanban')
   const [selectedDate, setSelectedDate] = useState(new Date())
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [searchParams] = useSearchParams()
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     if (organization) {
       fetchTasks()
+
+      // Check for saved view in URL params
+      const viewId = searchParams.get('view')
+      const viewTypeParam = searchParams.get('type')
+      if (viewId && viewTypeParam) {
+        setViewType(viewTypeParam as FlowViewType)
+      }
 
       // Subscribe to realtime updates
       const channel = supabase
@@ -42,7 +73,7 @@ function FMSPage() {
         supabase.removeChannel(channel)
       }
     }
-  }, [organization])
+  }, [organization, searchParams])
 
   const fetchTasks = async () => {
     try {
@@ -78,6 +109,32 @@ function FMSPage() {
     } catch (error: any) {
       toast.error('Failed to update task status')
     }
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      setActiveId(null)
+      return
+    }
+
+    const taskId = active.id as string
+    const newStatus = over.id as TaskStatus
+
+    // Validate status
+    const validStatuses: TaskStatus[] = ['pending', 'in_progress', 'completed', 'cancelled']
+    if (!validStatuses.includes(newStatus)) {
+      setActiveId(null)
+      return
+    }
+
+    updateTaskStatus(taskId, newStatus)
+    setActiveId(null)
+  }
+
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active.id)
   }
 
   const getTasksByStatus = (status: TaskStatus) => {
@@ -193,63 +250,48 @@ function FMSPage() {
       </div>
 
       {viewType === 'kanban' ? (
-        <div className="grid grid-cols-4 gap-4">
-          {(['pending', 'in_progress', 'completed', 'cancelled'] as TaskStatus[]).map((status) => (
-            <div key={status} className="flex flex-col">
-              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-t-lg">
-                <h3 className="font-semibold text-gray-700 dark:text-gray-200 capitalize">
-                  {status.replace('_', ' ')} ({getTasksByStatus(status).length})
-                </h3>
-              </div>
-              <div className="flex-1 p-2 bg-gray-50 dark:bg-gray-900 rounded-b-lg space-y-2 min-h-[400px]">
-                {getTasksByStatus(status).map((task) => (
-                  <Card
-                    key={task.id}
-                    className="p-4 cursor-pointer hover:shadow-md"
-                    onClick={() => navigate(`/delegation/tasks/${task.id}`)}
-                  >
-                    <h4 className="font-medium text-gray-700 dark:text-gray-200">{task.title}</h4>
-                    <div className="flex gap-2 mt-2">
-                      <Badge type={getStatusColor(task.status)}>{task.status}</Badge>
-                      <Badge>{task.priority}</Badge>
-                    </div>
-                    {task.due_date && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        Due: {new Date(task.due_date).toLocaleDateString()}
-                      </p>
-                    )}
-                    {status !== 'completed' && status !== 'cancelled' && (
-                      <div className="mt-2 flex gap-1">
-                        {status === 'pending' && (
-                          <Button
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              updateTaskStatus(task.id, 'in_progress')
-                            }}
-                          >
-                            Start
-                          </Button>
-                        )}
-                        {status === 'in_progress' && (
-                          <Button
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              updateTaskStatus(task.id, 'completed')
-                            }}
-                          >
-                            Complete
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid grid-cols-4 gap-4">
+            {(['pending', 'in_progress', 'completed', 'cancelled'] as TaskStatus[]).map((status) => {
+              const statusTasks = getTasksByStatus(status)
+              return (
+                <div key={status} className="flex flex-col">
+                  <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-t-lg">
+                    <h3 className="font-semibold text-gray-700 dark:text-gray-200 capitalize">
+                      {status.replace('_', ' ')} ({statusTasks.length})
+                    </h3>
+                  </div>
+                  <DroppableColumn id={status} items={statusTasks.map((t) => t.id)}>
+                    {statusTasks.map((task) => (
+                      <SortableTaskCard
+                        key={task.id}
+                        task={task}
+                        status={status}
+                        onNavigate={(id) => navigate(`/delegation/tasks/${id}`)}
+                        onStatusUpdate={updateTaskStatus}
+                        getStatusColor={getStatusColor}
+                      />
+                    ))}
+                  </DroppableColumn>
+                </div>
+              )
+            })}
+          </div>
+          <DragOverlay>
+            {activeId ? (
+              <Card className="p-4 opacity-90">
+                <h4 className="font-medium">
+                  {tasks.find((t) => t.id === activeId)?.title || 'Task'}
+                </h4>
+              </Card>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       ) : viewType === 'calendar' ? (
         <div className="space-y-4">
           <div className="flex justify-between items-center mb-4">
