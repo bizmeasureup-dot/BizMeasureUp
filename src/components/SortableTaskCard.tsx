@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Task, TaskStatus } from '@/types'
 import { Card, Badge } from '@roketid/windmill-react-ui'
 import TaskActionsButton from './TaskActionsButton'
+import { getOverdueDisplay } from '@/lib/taskUtils'
 
 interface SortableTaskCardProps {
   task: Task
@@ -37,6 +38,8 @@ function SortableTaskCard({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  const overdueDisplay = getOverdueDisplay(task)
+
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
@@ -47,11 +50,23 @@ function SortableTaskCard({
         <div className="flex gap-2 mt-2">
           <Badge type={getStatusColor(task.status)}>{task.status}</Badge>
           <Badge>{task.priority}</Badge>
+          {overdueDisplay && (
+            <Badge type="danger" className="text-xs">
+              {overdueDisplay}
+            </Badge>
+          )}
         </div>
         {task.due_date && (
-          <p className="mt-2 text-xs text-gray-500">
-            Due: {new Date(task.due_date).toLocaleDateString()}
-          </p>
+          <div className="mt-2">
+            <p className="text-xs text-gray-500">
+              Due: {new Date(task.due_date).toLocaleDateString()}
+            </p>
+            {overdueDisplay && (
+              <p className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">
+                {overdueDisplay}
+              </p>
+            )}
+          </div>
         )}
         {status !== 'completed' && status !== 'not_applicable' && (
           <div className="mt-2 flex gap-1">

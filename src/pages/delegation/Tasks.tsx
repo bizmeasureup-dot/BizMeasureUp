@@ -18,6 +18,7 @@ import { useTaskHistory } from '@/hooks/useTaskHistory'
 import { useRescheduleRequests } from '@/hooks/useRescheduleRequests'
 import { motion, AnimatePresence } from 'framer-motion'
 import { hasPermission } from '@/lib/rbac'
+import { getOverdueDisplay } from '@/lib/taskUtils'
 
 interface ExpandedTaskDetailsProps {
   task: Task
@@ -118,6 +119,14 @@ function ExpandedTaskDetails({
             <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
               {new Date(task.due_date).toLocaleString()}
             </p>
+            {(() => {
+              const overdueDisplay = getOverdueDisplay(task)
+              return overdueDisplay && (
+                <p className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">
+                  {overdueDisplay}
+                </p>
+              )
+            })()}
           </div>
         )}
 
@@ -660,7 +669,17 @@ function TasksPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <Badge type={getStatusColor(task.status)}>{task.status}</Badge>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge type={getStatusColor(task.status)}>{task.status}</Badge>
+                              {(() => {
+                                const overdueDisplay = getOverdueDisplay(task)
+                                return overdueDisplay && (
+                                  <Badge type="danger" className="text-xs font-semibold">
+                                    {overdueDisplay}
+                                  </Badge>
+                                )
+                              })()}
+                            </div>
                           </td>
                           <td className="px-4 py-3 hidden md:table-cell">
                             <Badge type={getPriorityColor(task.priority)}>{task.priority}</Badge>
@@ -669,7 +688,19 @@ function TasksPage() {
                             {getAssignedUserName(task.assigned_to)}
                           </td>
                           <td className="px-4 py-3 text-sm hidden lg:table-cell">
-                            {task.due_date ? new Date(task.due_date).toLocaleDateString() : '-'}
+                            {task.due_date ? (
+                              <div>
+                                <div className="font-medium">{new Date(task.due_date).toLocaleDateString()}</div>
+                                {(() => {
+                                  const overdueDisplay = getOverdueDisplay(task)
+                                  return overdueDisplay && (
+                                    <div className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">
+                                      {overdueDisplay}
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            ) : '-'}
                           </td>
                           <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                             {(canEdit || canDelete) && (

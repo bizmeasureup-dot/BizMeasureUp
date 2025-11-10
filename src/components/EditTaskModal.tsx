@@ -105,19 +105,28 @@ function EditTaskModal({ isOpen, onClose, onSuccess, taskId }: EditTaskModalProp
     setLoading(true)
 
     try {
+      const updateData: any = {
+        title: formData.title,
+        description: formData.description || null,
+        status: formData.status,
+        priority: formData.priority,
+        due_date: formData.due_date || null,
+        assigned_to: formData.assigned_to,
+      }
+
+      // Only set original_due_date if task never had one and we're setting a due_date
+      // The database trigger will protect original_due_date from being updated if it already exists
+      if (!task?.original_due_date && formData.due_date) {
+        updateData.original_due_date = formData.due_date
+      }
+
+      if (formData.status === 'completed' && !task?.completed_at) {
+        updateData.completed_at = new Date().toISOString()
+      }
+
       const { error } = await supabase
         .from('tasks')
-        .update({
-          title: formData.title,
-          description: formData.description || null,
-          status: formData.status,
-          priority: formData.priority,
-          due_date: formData.due_date || null,
-          assigned_to: formData.assigned_to,
-          ...(formData.status === 'completed' && !task?.completed_at
-            ? { completed_at: new Date().toISOString() }
-            : {}),
-        })
+        .update(updateData)
         .eq('id', taskId)
 
       if (error) throw error

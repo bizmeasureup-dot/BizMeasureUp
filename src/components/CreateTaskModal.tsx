@@ -71,6 +71,7 @@ function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTaskModalProps) {
     setLoading(true)
 
     try {
+      const dueDate = formData.due_date || null
       const { data, error } = await supabase
         .from('tasks')
         .insert({
@@ -81,7 +82,8 @@ function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTaskModalProps) {
           created_by: appUser.id,
           status: 'pending' as TaskStatus,
           priority: formData.priority,
-          due_date: formData.due_date || null,
+          due_date: dueDate,
+          original_due_date: dueDate, // Set original_due_date when creating task (trigger will also handle this)
           attachment_required: formData.attachment_required,
         })
         .select()

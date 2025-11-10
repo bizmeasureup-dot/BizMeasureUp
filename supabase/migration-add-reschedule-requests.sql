@@ -115,7 +115,7 @@ BEGIN
   
   GET DIAGNOSTICS approved_count = ROW_COUNT;
   
-  -- Update tasks with approved due dates
+  -- Update tasks with approved due dates (preserve original_due_date)
   UPDATE public.tasks
   SET 
     due_date = ask_reschedule_requests.requested_due_date,
@@ -129,6 +129,7 @@ BEGIN
       FROM public.ask_reschedule_requests 
       WHERE task_id = tasks.id AND status = 'approved'
     );
+  -- Note: original_due_date is preserved automatically by the protect_original_due_date_trigger
   
   RETURN approved_count;
 END;
@@ -175,12 +176,13 @@ BEGIN
     updated_at = TIMEZONE('utc', NOW())
   WHERE id = request_id;
   
-  -- Update task due_date
+  -- Update task due_date (preserve original_due_date)
   UPDATE public.tasks
   SET 
     due_date = request_record.requested_due_date,
     updated_at = TIMEZONE('utc', NOW())
   WHERE id = request_record.task_id;
+  -- Note: original_due_date is preserved automatically by the protect_original_due_date_trigger
   
   RETURN TRUE;
 END;
