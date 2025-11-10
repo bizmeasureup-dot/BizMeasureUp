@@ -129,3 +129,19 @@ export interface FlowView {
   updated_at: string
 }
 
+// Task History Types
+export type TaskHistoryChangeType = 'status' | 'assignment' | 'due_date' | 'reschedule_request'
+
+export interface TaskHistory {
+  id: string
+  task_id: string
+  changed_by: string
+  change_type: TaskHistoryChangeType
+  old_value?: Record<string, any>
+  new_value?: Record<string, any>
+  metadata?: Record<string, any>
+  created_at: string
+  // Joined fields
+  changed_by_user?: User
+}
+

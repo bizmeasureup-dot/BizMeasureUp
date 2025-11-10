@@ -12,7 +12,9 @@ import TaskActionsButton from '@/components/TaskActionsButton'
 import RescheduleTaskModal from '@/components/RescheduleTaskModal'
 import CompleteTaskModal from '@/components/CompleteTaskModal'
 import ApprovalCard from '@/components/ApprovalCard'
+import TaskHistoryModal from '@/components/TaskHistoryModal'
 import { useRescheduleRequests } from '@/hooks/useRescheduleRequests'
+import { useTaskHistory } from '@/hooks/useTaskHistory'
 
 function TaskDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -25,10 +27,13 @@ function TaskDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false)
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   
   const { requests, refetch: refetchRequests, approveRequest, rejectRequest } = useRescheduleRequests({
     taskId: id || null,
   })
+  
+  const { history, loading: historyLoading, refetch: refetchHistory } = useTaskHistory(id || null)
   
   const pendingRequests = requests.filter(r => r.status === 'pending')
 
@@ -183,6 +188,31 @@ function TaskDetailPage() {
 
       <Card className="mb-6 relative">
         <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{task.title}</h2>
+            <button
+              onClick={() => {
+                setIsHistoryModalOpen(true)
+                refetchHistory()
+              }}
+              className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              title="View task history"
+              aria-label="View task history"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+          </div>
+          
           <div className="flex gap-4 mb-4">
             <Badge type={task.status === 'completed' ? 'success' : task.status === 'in_progress' ? 'primary' : 'warning'}>
               {task.status}
@@ -280,6 +310,13 @@ function TaskDetailPage() {
           fetchTask()
         }}
         task={task}
+      />
+
+      <TaskHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        history={history}
+        loading={historyLoading}
       />
     </div>
   )
