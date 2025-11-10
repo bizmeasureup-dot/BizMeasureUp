@@ -104,7 +104,7 @@ function EditTaskPage() {
       if (error) throw error
 
       toast.success('Task updated successfully!')
-      navigate(`/delegation/tasks/${id}`)
+      navigate('/delegation/tasks')
     } catch (error: any) {
       console.error('Error updating task:', error)
       toast.error(error.message || 'Failed to update task')
@@ -206,7 +206,7 @@ function EditTaskPage() {
               <Button type="submit" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
-              <Button layout="outline" type="button" onClick={() => navigate(`/delegation/tasks/${id}`)}>
+              <Button layout="outline" type="button" onClick={() => navigate('/delegation/tasks')}>
                 Cancel
               </Button>
             </div>

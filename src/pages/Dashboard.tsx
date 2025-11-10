@@ -162,7 +162,7 @@ function DashboardPage() {
                 <div
                   key={task.id}
                   className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                  onClick={() => navigate(`/delegation/tasks/${task.id}`)}
+                  onClick={() => navigate('/delegation/tasks')}
                 >
                   <h3 className="font-medium text-gray-700 dark:text-gray-200">{task.title}</h3>
                   <p className="text-sm text-gray-500">{task.status}</p>

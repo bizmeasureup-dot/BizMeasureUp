@@ -128,7 +128,7 @@ function Header() {
                       href="#"
                       onClick={(e: React.MouseEvent) => {
                         e.preventDefault()
-                        navigate(`/delegation/tasks/${request.task_id}`)
+                        navigate('/delegation/tasks')
                         setIsNotificationsMenuOpen(false)
                       }}
                     >

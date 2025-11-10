@@ -14,7 +14,6 @@ import DashboardPage from '@/pages/Dashboard'
 
 // Delegation module
 import TasksPage from '@/pages/delegation/Tasks'
-import TaskDetailPage from '@/pages/delegation/TaskDetail'
 import EditTaskPage from '@/pages/delegation/EditTask'
 
 // Checklist module
@@ -84,16 +83,6 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <TasksPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/delegation/tasks/:id"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <TaskDetailPage />
             </Layout>
           </ProtectedRoute>
         }

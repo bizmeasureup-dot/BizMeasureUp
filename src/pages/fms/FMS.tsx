@@ -274,7 +274,7 @@ function FMSPage() {
                         key={task.id}
                         task={task}
                         status={status}
-                        onNavigate={(id) => navigate(`/delegation/tasks/${id}`)}
+                        onNavigate={(id) => navigate('/delegation/tasks')}
                         onStatusUpdate={updateTaskStatus}
                         getStatusColor={getStatusColor}
                         onReschedule={() => setReschedulingTask(task)}
@@ -351,7 +351,7 @@ function FMSPage() {
                       <Card
                         key={task.id}
                         className="p-1 text-xs cursor-pointer hover:shadow-sm"
-                        onClick={() => navigate(`/delegation/tasks/${task.id}`)}
+                        onClick={() => navigate('/delegation/tasks')}
                       >
                         <div className="truncate font-medium">{task.title}</div>
                         <Badge type={getStatusColor(task.status)}>
@@ -407,7 +407,7 @@ function FMSPage() {
                       <React.Fragment key={task.id}>
                         <div
                           className="p-2 border-b cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                          onClick={() => navigate(`/delegation/tasks/${task.id}`)}
+                          onClick={() => navigate('/delegation/tasks')}
                         >
                           <div className="font-medium">{task.title}</div>
                           <div className="text-xs text-gray-500">
@@ -449,7 +449,7 @@ function FMSPage() {
             <Card
               key={task.id}
               className="p-6 cursor-pointer hover:shadow-lg"
-              onClick={() => navigate(`/delegation/tasks/${task.id}`)}
+              onClick={() => navigate('/delegation/tasks')}
             >
               <div className="flex justify-between items-start">
                 <div>
