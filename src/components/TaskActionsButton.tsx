@@ -10,6 +10,7 @@ interface TaskActionsButtonProps {
   onReschedule?: () => void
   onEdit?: () => void
   onDelete?: () => void
+  onMarkNotApplicable?: () => void
   size?: 'small' | 'regular' | 'large'
   className?: string
   position?: 'default' | 'bottom-right'
@@ -22,6 +23,7 @@ function TaskActionsButton({
   onReschedule,
   onEdit,
   onDelete,
+  onMarkNotApplicable,
   size = 'small',
   className = '',
   position = 'default',
@@ -48,9 +50,9 @@ function TaskActionsButton({
         } else {
           // Estimate based on number of items (each item ~40px, padding ~8px)
           let itemCount = 0
-          if (task.status === 'pending' && onStartTask) itemCount++
-          if (task.status === 'in_progress' && onMarkComplete) itemCount++
-          if (onReschedule) itemCount++
+          if (task.status === 'pending' && onMarkComplete) itemCount++
+          if (onReschedule && task.status !== 'completed' && task.status !== 'not_applicable') itemCount++
+          if (onMarkNotApplicable && task.status !== 'completed' && task.status !== 'not_applicable') itemCount++
           if (onEdit) itemCount++
           if (onDelete) itemCount++
           menuHeight = itemCount * 40 + 8 // 8px padding
@@ -70,7 +72,7 @@ function TaskActionsButton({
         })
       }
     }
-  }, [position, task.status, onStartTask, onMarkComplete, onReschedule, onEdit, onDelete])
+  }, [position, task.status, onMarkComplete, onReschedule, onEdit, onDelete, onMarkNotApplicable])
 
   // Update position on scroll/resize
   useEffect(() => {
@@ -200,9 +202,23 @@ function TaskActionsButton({
     setIsVisible(false)
   }
 
+  const handleMarkNotApplicable = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+    onMarkNotApplicable?.()
+    setIsHovered(false)
+    setIsVisible(false)
+  }
+
   // Check if we have any actions to show
-  const hasStatusActions = task.status !== 'completed' && task.status !== 'cancelled' && (onStartTask || onMarkComplete)
-  const hasOtherActions = onReschedule || onEdit || onDelete
+  const hasStatusActions = task.status !== 'completed' && task.status !== 'not_applicable' && onMarkComplete
+  const hasOtherActions = (onReschedule && task.status !== 'completed' && task.status !== 'not_applicable') || 
+                          (onMarkNotApplicable && task.status !== 'completed' && task.status !== 'not_applicable') || 
+                          onEdit || 
+                          onDelete
   const hasActions = hasStatusActions || hasOtherActions
   
   if (!hasActions) {
@@ -263,16 +279,7 @@ function TaskActionsButton({
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="py-1">
-            {task.status === 'pending' && onStartTask && (
-              <button
-                onClick={handleStartTask}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150 flex items-center gap-2"
-              >
-                <span className="text-green-500">🟢</span>
-                Start Task
-              </button>
-            )}
-            {task.status === 'in_progress' && onMarkComplete && (
+            {task.status === 'pending' && onMarkComplete && (
               <button
                 onClick={handleMarkComplete}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150 flex items-center gap-2"
@@ -281,13 +288,22 @@ function TaskActionsButton({
                 Mark Complete
               </button>
             )}
-            {onReschedule && task.status !== 'completed' && (
+            {onReschedule && task.status !== 'completed' && task.status !== 'not_applicable' && (
               <button
                 onClick={handleReschedule}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150 flex items-center gap-2"
               >
                 <span>🔁</span>
                 Reschedule
+              </button>
+            )}
+            {onMarkNotApplicable && task.status !== 'completed' && task.status !== 'not_applicable' && (
+              <button
+                onClick={handleMarkNotApplicable}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150 flex items-center gap-2"
+              >
+                <span>🚫</span>
+                Mark Not Applicable
               </button>
             )}
             {onEdit && (

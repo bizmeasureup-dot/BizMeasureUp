@@ -125,7 +125,7 @@ function FMSPage() {
     const newStatus = over.id as TaskStatus
 
     // Validate status
-    const validStatuses: TaskStatus[] = ['pending', 'in_progress', 'completed', 'cancelled']
+    const validStatuses: TaskStatus[] = ['pending', 'rescheduling', 'completed', 'not_applicable']
     if (!validStatuses.includes(newStatus)) {
       setActiveId(null)
       return
@@ -196,10 +196,10 @@ function FMSPage() {
     switch (status) {
       case 'completed':
         return 'success'
-      case 'in_progress':
+      case 'rescheduling':
         return 'primary'
-      case 'cancelled':
-        return 'danger'
+      case 'not_applicable':
+        return 'neutral'
       default:
         return 'warning'
     }
@@ -259,7 +259,7 @@ function FMSPage() {
           onDragEnd={handleDragEnd}
         >
           <div className="grid grid-cols-4 gap-4">
-            {(['pending', 'in_progress', 'completed', 'cancelled'] as TaskStatus[]).map((status) => {
+            {(['pending', 'rescheduling', 'completed', 'not_applicable'] as TaskStatus[]).map((status) => {
               const statusTasks = getTasksByStatus(status)
               return (
                 <div key={status} className="flex flex-col">
@@ -420,8 +420,10 @@ function FMSPage() {
                               className={`absolute h-full rounded ${
                                 task.status === 'completed'
                                   ? 'bg-green-500'
-                                  : task.status === 'in_progress'
+                                  : task.status === 'rescheduling'
                                   ? 'bg-blue-500'
+                                  : task.status === 'not_applicable'
+                                  ? 'bg-gray-500'
                                   : 'bg-yellow-500'
                               }`}
                               style={{

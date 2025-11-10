@@ -53,13 +53,13 @@ function SortableTaskCard({
             Due: {new Date(task.due_date).toLocaleDateString()}
           </p>
         )}
-        {status !== 'completed' && status !== 'cancelled' && (
+        {status !== 'completed' && status !== 'not_applicable' && (
           <div className="mt-2 flex gap-1">
             <TaskActionsButton
               task={task}
-              onStartTask={() => onStatusUpdate(task.id, 'in_progress')}
               onMarkComplete={() => onStatusUpdate(task.id, 'completed')}
               onReschedule={onReschedule}
+              onMarkNotApplicable={() => onStatusUpdate(task.id, 'not_applicable')}
             />
           </div>
         )}

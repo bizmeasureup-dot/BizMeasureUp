@@ -157,9 +157,9 @@ function EditTaskPage() {
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as TaskStatus })}
               >
                 <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
+                <option value="rescheduling">Rescheduling</option>
                 <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="not_applicable">Not Applicable</option>
               </Select>
             </Label>
 

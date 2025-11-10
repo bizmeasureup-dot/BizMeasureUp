@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create enum types
 CREATE TYPE user_role AS ENUM ('admin', 'owner', 'doer', 'viewer');
-CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'completed', 'cancelled');
+CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'completed', 'cancelled', 'rescheduling', 'not_applicable');
 CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high', 'urgent');
 CREATE TYPE metric_type AS ENUM ('task_completion', 'checklist_completion', 'custom');
 CREATE TYPE metric_period AS ENUM ('daily', 'weekly', 'monthly');

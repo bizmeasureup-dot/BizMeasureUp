@@ -29,7 +29,7 @@ export interface OrganizationMember {
 }
 
 // Task Types
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
+export type TaskStatus = 'pending' | 'rescheduling' | 'completed' | 'not_applicable'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type RescheduleRequestStatus = 'pending' | 'approved' | 'rejected'
 

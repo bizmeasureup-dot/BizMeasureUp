@@ -81,8 +81,9 @@ function ScoreboardPage() {
       const stats = {
         total: data?.length || 0,
         completed: data?.filter((t) => t.status === 'completed').length || 0,
-        inProgress: data?.filter((t) => t.status === 'in_progress').length || 0,
         pending: data?.filter((t) => t.status === 'pending').length || 0,
+        rescheduling: data?.filter((t) => t.status === 'rescheduling').length || 0,
+        notApplicable: data?.filter((t) => t.status === 'not_applicable').length || 0,
       }
 
       setTaskStats(stats)

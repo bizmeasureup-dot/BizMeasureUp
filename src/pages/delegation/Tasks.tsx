@@ -327,10 +327,10 @@ function TasksPage() {
     switch (status) {
       case 'completed':
         return 'success'
-      case 'in_progress':
+      case 'rescheduling':
         return 'primary'
-      case 'cancelled':
-        return 'danger'
+      case 'not_applicable':
+        return 'neutral'
       default:
         return 'warning'
     }
@@ -676,18 +676,20 @@ function TasksPage() {
                               <div data-actions-button onClick={(e) => e.stopPropagation()}>
                                 <TaskActionsButton
                                   task={task}
-                                  onStartTask={canEdit && task.status === 'pending' ? () => updateTaskStatus(task.id, 'in_progress') : undefined}
-                                  onMarkComplete={canEdit && task.status === 'in_progress' ? () => {
+                                  onMarkComplete={canEdit && task.status === 'pending' ? () => {
                                     const taskToComplete = tasks.find(t => t.id === task.id)
                                     if (taskToComplete) {
                                       setCompletingTask(taskToComplete)
                                     }
                                   } : undefined}
-                                  onReschedule={canEdit ? () => {
+                                  onReschedule={canEdit && task.status !== 'completed' && task.status !== 'not_applicable' ? () => {
                                     const taskToReschedule = tasks.find(t => t.id === task.id)
                                     if (taskToReschedule) {
                                       setReschedulingTask(taskToReschedule)
                                     }
+                                  } : undefined}
+                                  onMarkNotApplicable={canEdit && task.status !== 'completed' && task.status !== 'not_applicable' ? () => {
+                                    updateTaskStatus(task.id, 'not_applicable')
                                   } : undefined}
                                   onEdit={canEdit ? () => {
                                     setEditingTaskId(task.id)

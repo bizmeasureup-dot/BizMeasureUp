@@ -15,8 +15,9 @@ function DashboardPage() {
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
-    inProgress: 0,
     pending: 0,
+    rescheduling: 0,
+    notApplicable: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -70,8 +71,9 @@ function DashboardPage() {
       setStats({
         total: tasks.length,
         completed: tasks.filter((t) => t.status === 'completed').length,
-        inProgress: tasks.filter((t) => t.status === 'in_progress').length,
         pending: tasks.filter((t) => t.status === 'pending').length,
+        rescheduling: tasks.filter((t) => t.status === 'rescheduling').length,
+        notApplicable: tasks.filter((t) => t.status === 'not_applicable').length,
       })
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -99,9 +101,9 @@ function DashboardPage() {
     <div>
       <PageTitle>Dashboard</PageTitle>
 
-      <div className="grid gap-6 mb-8 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-6 mb-8 md:grid-cols-2 xl:grid-cols-5">
         {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
+          Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)
         ) : (
           <>
             <Card>
@@ -122,17 +124,25 @@ function DashboardPage() {
             </Card>
             <Card>
               <div className="p-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</p>
-                <p className="mt-2 text-3xl font-semibold text-blue-600">
-                  {stats.inProgress}
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
+                <p className="mt-2 text-3xl font-semibold text-yellow-600">
+                  {stats.pending}
                 </p>
               </div>
             </Card>
             <Card>
               <div className="p-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
-                <p className="mt-2 text-3xl font-semibold text-yellow-600">
-                  {stats.pending}
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Rescheduling</p>
+                <p className="mt-2 text-3xl font-semibold text-blue-600">
+                  {stats.rescheduling}
+                </p>
+              </div>
+            </Card>
+            <Card>
+              <div className="p-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Not Applicable</p>
+                <p className="mt-2 text-3xl font-semibold text-gray-600">
+                  {stats.notApplicable}
                 </p>
               </div>
             </Card>
