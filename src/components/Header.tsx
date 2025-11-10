@@ -13,15 +13,23 @@ import {
 import { Avatar, Badge, Input, Dropdown, DropdownItem, WindmillContext } from '@roketid/windmill-react-ui'
 import { useAuth } from '@/context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { useRescheduleRequests } from '@/hooks/useRescheduleRequests'
 
 function Header() {
   const { mode, toggleMode } = useContext(WindmillContext)
   const { toggleSidebar } = useContext(SidebarContext)
-  const { appUser, signOut } = useAuth()
+  const { appUser, signOut, organization } = useAuth()
   const navigate = useNavigate()
+  const { requests, getPendingCount } = useRescheduleRequests({
+    organizationId: organization?.id || null,
+    status: 'pending',
+  })
 
   const [isNotificationsMenuOpen, setIsNotificationsMenuOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  
+  const pendingCount = getPendingCount()
+  const recentPending = requests.slice(0, 5)
 
   function handleNotificationsClick() {
     setIsNotificationsMenuOpen(!isNotificationsMenuOpen)
@@ -84,10 +92,12 @@ function Header() {
               aria-haspopup="true"
             >
               <BellIcon className="w-5 h-5" aria-hidden="true" />
-              <span
-                aria-hidden="true"
-                className="absolute top-0 right-0 inline-block w-3 h-3 transform translate-x-1 -translate-y-1 bg-red-600 border-2 border-white rounded-full dark:border-gray-800"
-              ></span>
+              {pendingCount > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute top-0 right-0 inline-block w-3 h-3 transform translate-x-1 -translate-y-1 bg-red-600 border-2 border-white rounded-full dark:border-gray-800"
+                ></span>
+              )}
             </button>
 
             <Dropdown
@@ -95,17 +105,50 @@ function Header() {
               isOpen={isNotificationsMenuOpen}
               onClose={() => setIsNotificationsMenuOpen(false)}
             >
-              <DropdownItem tag="a" href="#" className="justify-between">
-                <span>Messages</span>
-                <Badge type="danger">13</Badge>
+              <DropdownItem
+                tag="a"
+                href="#"
+                onClick={(e: React.MouseEvent) => {
+                  e.preventDefault()
+                  navigate('/approvals')
+                  setIsNotificationsMenuOpen(false)
+                }}
+                className="justify-between"
+              >
+                <span>Reschedule Approvals</span>
+                {pendingCount > 0 && <Badge type="danger">{pendingCount}</Badge>}
               </DropdownItem>
-              <DropdownItem tag="a" href="#" className="justify-between">
-                <span>Sales</span>
-                <Badge type="danger">2</Badge>
-              </DropdownItem>
-              <DropdownItem onClick={() => alert('Alerts!')}>
-                <span>Alerts</span>
-              </DropdownItem>
+              {recentPending.length > 0 && (
+                <>
+                  <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+                  {recentPending.map((request) => (
+                    <DropdownItem
+                      key={request.id}
+                      tag="a"
+                      href="#"
+                      onClick={(e: React.MouseEvent) => {
+                        e.preventDefault()
+                        navigate(`/delegation/tasks/${request.task_id}`)
+                        setIsNotificationsMenuOpen(false)
+                      }}
+                    >
+                      <div className="text-sm">
+                        <div className="font-medium truncate">
+                          {request.task?.title || 'Task'}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Reschedule request pending
+                        </div>
+                      </div>
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+              {recentPending.length === 0 && pendingCount === 0 && (
+                <DropdownItem>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">No pending approvals</span>
+                </DropdownItem>
+              )}
             </Dropdown>
           </li>
           {/* Profile menu */}

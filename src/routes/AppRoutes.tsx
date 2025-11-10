@@ -40,6 +40,9 @@ import TeamManagementPage from '@/pages/team/TeamManagement'
 // FMS
 import FlowViewsPage from '@/pages/fms/FlowViews'
 
+// Approvals
+import ApprovalsPage from '@/pages/approvals/Approvals'
+
 function AppRoutes() {
   const { user, loading } = useAuth()
 
@@ -199,6 +202,18 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <SettingsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Approvals routes */}
+      <Route
+        path="/approvals"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ApprovalsPage />
             </Layout>
           </ProtectedRoute>
         }

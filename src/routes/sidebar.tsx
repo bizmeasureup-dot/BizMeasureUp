@@ -58,6 +58,12 @@ const routes: IRoute[] = [
     roles: ['admin', 'owner'],
   },
   {
+    path: '/approvals',
+    icon: 'BellIcon',
+    name: 'Approvals',
+    roles: ['admin', 'owner'],
+  },
+  {
     path: '/team',
     icon: 'TablesIcon',
     name: 'Team Management',

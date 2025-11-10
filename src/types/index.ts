@@ -31,6 +31,29 @@ export interface OrganizationMember {
 // Task Types
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type RescheduleRequestStatus = 'pending' | 'approved' | 'rejected'
+
+export interface RescheduleRequest {
+  id: string
+  task_id: string
+  requested_by: string
+  requested_due_date: string
+  current_due_date?: string
+  status: RescheduleRequestStatus
+  approved_by?: string
+  approved_at?: string
+  rejected_by?: string
+  rejected_at?: string
+  rejection_reason?: string
+  expires_at: string
+  created_at: string
+  updated_at: string
+  // Joined fields
+  task?: Task
+  requester?: User
+  approver?: User
+  rejector?: User
+}
 
 export interface Task {
   id: string

@@ -11,6 +11,8 @@ import { CardSkeleton } from '@/components/LoadingSkeleton'
 import TaskActionsButton from '@/components/TaskActionsButton'
 import RescheduleTaskModal from '@/components/RescheduleTaskModal'
 import CompleteTaskModal from '@/components/CompleteTaskModal'
+import ApprovalCard from '@/components/ApprovalCard'
+import { useRescheduleRequests } from '@/hooks/useRescheduleRequests'
 
 function TaskDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -23,6 +25,12 @@ function TaskDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false)
+  
+  const { requests, refetch: refetchRequests, approveRequest, rejectRequest } = useRescheduleRequests({
+    taskId: id || null,
+  })
+  
+  const pendingRequests = requests.filter(r => r.status === 'pending')
 
   useEffect(() => {
     if (id) {
@@ -229,6 +237,28 @@ function TaskDetailPage() {
           )}
         </div>
       </Card>
+
+      {pendingRequests.length > 0 && (
+        <Card className="mb-6">
+          <div className="p-6">
+            <h3 className="font-semibold mb-4">Pending Reschedule Requests</h3>
+            <div className="space-y-4">
+              {pendingRequests.map((request) => (
+                <ApprovalCard
+                  key={request.id}
+                  request={request}
+                  onApprove={approveRequest}
+                  onReject={rejectRequest}
+                  onUpdate={() => {
+                    refetchRequests()
+                    fetchTask()
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Button layout="outline" onClick={() => navigate('/delegation/tasks')}>
         Back to Tasks

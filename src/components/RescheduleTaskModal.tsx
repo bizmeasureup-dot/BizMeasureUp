@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useToastContext } from '@/context/ToastContext'
-import { supabase } from '@/lib/supabase'
+import { useRescheduleRequests } from '@/hooks/useRescheduleRequests'
 import { Task } from '@/types'
 import { Button, Label, Input } from '@roketid/windmill-react-ui'
 import Modal from './Modal'
@@ -14,6 +14,7 @@ interface RescheduleTaskModalProps {
 
 function RescheduleTaskModal({ isOpen, onClose, onSuccess, task }: RescheduleTaskModalProps) {
   const toast = useToastContext()
+  const { createRequest } = useRescheduleRequests()
   const [loading, setLoading] = useState(false)
   const [dueDate, setDueDate] = useState('')
 
@@ -33,21 +34,16 @@ function RescheduleTaskModal({ isOpen, onClose, onSuccess, task }: RescheduleTas
     setLoading(true)
 
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({
-          due_date: dueDate || null,
-        })
-        .eq('id', task.id)
+      const { data, error } = await createRequest(task.id, dueDate, 7)
 
-      if (error) throw error
+      if (error) throw new Error(error)
 
-      toast.success('Task rescheduled successfully!')
+      toast.success('Reschedule request submitted! The task creator will be notified for approval.')
       onSuccess?.()
       onClose()
     } catch (error: any) {
-      console.error('Error rescheduling task:', error)
-      toast.error(error.message || 'Failed to reschedule task')
+      console.error('Error creating reschedule request:', error)
+      toast.error(error.message || 'Failed to submit reschedule request')
     } finally {
       setLoading(false)
     }
@@ -61,6 +57,9 @@ function RescheduleTaskModal({ isOpen, onClose, onSuccess, task }: RescheduleTas
         <div className="mb-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Current due date: {task.due_date ? new Date(task.due_date).toLocaleString() : 'Not set'}
+          </p>
+          <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+            Note: This will create a reschedule request that requires approval from the task creator or an admin/owner.
           </p>
         </div>
 
@@ -80,7 +79,7 @@ function RescheduleTaskModal({ isOpen, onClose, onSuccess, task }: RescheduleTas
             Cancel
           </Button>
           <Button type="submit" disabled={loading}>
-            {loading ? 'Rescheduling...' : 'Reschedule'}
+            {loading ? 'Submitting...' : 'Submit Request'}
           </Button>
         </div>
       </form>
