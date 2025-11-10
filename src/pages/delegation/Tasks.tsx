@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useTasks } from '@/hooks/useTasks'
 import { useToastContext } from '@/context/ToastContext'
 import { supabase } from '@/lib/supabase'
-import { Task, User, TaskHistory } from '@/types'
-import { Button, Card, Badge, Input } from '@roketid/windmill-react-ui'
+import { Task, User, TaskHistory, TaskStatus, TaskPriority } from '@/types'
+import { Button, Card, Badge, Input, Select, Label } from '@roketid/windmill-react-ui'
 import PageTitle from '@/components/Typography/PageTitle'
 import { TaskCardSkeleton } from '@/components/LoadingSkeleton'
 import Pagination from '@/components/Pagination'
@@ -271,6 +271,14 @@ function TasksPage() {
   const [usersMap, setUsersMap] = useState<Record<string, User>>({})
   const [historyExpandedTasks, setHistoryExpandedTasks] = useState<Set<string>>(new Set())
   const [historyUserMap, setHistoryUserMap] = useState<Map<string, User>>(new Map())
+  const [availableUsers, setAvailableUsers] = useState<User[]>([])
+  
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all')
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all')
+  const [dueDateFilter, setDueDateFilter] = useState<'all' | 'overdue' | 'today' | 'this_week' | 'upcoming' | 'no_due_date'>('all')
+  const [assignedToFilter, setAssignedToFilter] = useState<string | 'all'>('all')
+  
   const itemsPerPage = 10
 
   const { tasks, loading, error, refetch } = useTasks(
@@ -279,14 +287,32 @@ function TasksPage() {
     appUser?.id
   )
 
-  // Fetch users when tasks change
-  useEffect(() => {
-    if (tasks.length > 0) {
-      fetchUsersForTasks()
-    }
-  }, [tasks])
+  const fetchOrganizationUsers = useCallback(async () => {
+    if (!organization) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select('*, users(*)')
+        .eq('organization_id', organization.id)
 
-  const fetchUsersForTasks = async () => {
+      if (error) throw error
+      
+      const users = (data || []).map((member: any) => member.users).filter(Boolean) as User[]
+      setAvailableUsers(users)
+      
+      // Also update usersMap for display purposes
+      const map: Record<string, User> = {}
+      users.forEach(user => {
+        map[user.id] = user
+      })
+      setUsersMap(prev => ({ ...prev, ...map }))
+    } catch (error) {
+      console.error('Error fetching organization users:', error)
+    }
+  }, [organization])
+
+  const fetchUsersForTasks = useCallback(async () => {
     try {
       const userIds = [
         ...new Set([
@@ -307,19 +333,87 @@ function TasksPage() {
       data?.forEach(user => {
         map[user.id] = user
       })
-      setUsersMap(map)
+      setUsersMap(prev => ({ ...prev, ...map }))
     } catch (error) {
       console.error('Error fetching users for tasks:', error)
     }
+  }, [tasks])
+
+  // Fetch all organization users for filter dropdown
+  useEffect(() => {
+    if (organization) {
+      fetchOrganizationUsers()
+    }
+  }, [organization, fetchOrganizationUsers])
+
+  // Fetch users when tasks change
+  useEffect(() => {
+    if (tasks.length > 0) {
+      fetchUsersForTasks()
+    }
+  }, [tasks, fetchUsersForTasks])
+
+
+  // Helper function to check if task matches due date filter
+  const matchesDueDateFilter = (task: Task): boolean => {
+    if (dueDateFilter === 'all') return true
+    if (!task.due_date) return dueDateFilter === 'no_due_date'
+    if (dueDateFilter === 'no_due_date') return false
+    
+    const now = new Date()
+    const dueDate = new Date(task.due_date)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+    const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    
+    switch (dueDateFilter) {
+      case 'overdue':
+        return dueDate < now && task.status !== 'completed'
+      case 'today':
+        return dueDate >= todayStart && dueDate <= todayEnd
+      case 'this_week':
+        return dueDate >= todayStart && dueDate <= weekEnd
+      case 'upcoming':
+        return dueDate > now
+      default:
+        return true
+    }
   }
 
-
-  // Filter tasks by search query
-  const filteredTasks = tasks.filter(
-    (task) =>
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Filter tasks by all filters
+  const filteredTasks = tasks.filter((task) => {
+    // Status filter
+    if (statusFilter !== 'all' && task.status !== statusFilter) {
+      return false
+    }
+    
+    // Priority filter
+    if (priorityFilter !== 'all' && task.priority !== priorityFilter) {
+      return false
+    }
+    
+    // Due date filter
+    if (!matchesDueDateFilter(task)) {
+      return false
+    }
+    
+    // Assigned to filter
+    if (assignedToFilter !== 'all' && task.assigned_to !== assignedToFilter) {
+      return false
+    }
+    
+    // Search query filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchesTitle = task.title.toLowerCase().includes(query)
+      const matchesDescription = task.description?.toLowerCase().includes(query) || false
+      if (!matchesTitle && !matchesDescription) {
+        return false
+      }
+    }
+    
+    return true
+  })
 
   // Paginate tasks
   const totalPages = Math.ceil(filteredTasks.length / itemsPerPage)
@@ -434,6 +528,23 @@ function TasksPage() {
     if (!userId) return 'Unassigned'
     const user = historyUserMap.get(userId) || usersMap[userId]
     return user ? (user.full_name || user.email) : 'Unknown User'
+  }
+
+  const clearFilters = () => {
+    setStatusFilter('all')
+    setPriorityFilter('all')
+    setDueDateFilter('all')
+    setAssignedToFilter('all')
+    setSearchQuery('')
+    setCurrentPage(1)
+  }
+
+  const hasActiveFilters = () => {
+    return statusFilter !== 'all' || 
+           priorityFilter !== 'all' || 
+           dueDateFilter !== 'all' || 
+           assignedToFilter !== 'all' || 
+           searchQuery !== ''
   }
 
   const formatHistoryEntry = (entry: TaskHistory) => {
@@ -561,48 +672,140 @@ function TasksPage() {
         task={reschedulingTask}
       />
 
-      <div className="mb-4 flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <Input
-            placeholder="Search tasks..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value)
-              setCurrentPage(1)
-            }}
-          />
+      <div className="mb-4 space-y-4">
+        {/* Search and Ownership Filters */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <Input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setCurrentPage(1)
+              }}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="small"
+              layout={filter === 'all' ? 'primary' : 'outline'}
+              onClick={() => {
+                setFilter('all')
+                setCurrentPage(1)
+              }}
+            >
+              All
+            </Button>
+            <Button
+              size="small"
+              layout={filter === 'assigned' ? 'primary' : 'outline'}
+              onClick={() => {
+                setFilter('assigned')
+                setCurrentPage(1)
+              }}
+            >
+              Assigned to Me
+            </Button>
+            <Button
+              size="small"
+              layout={filter === 'created' ? 'primary' : 'outline'}
+              onClick={() => {
+                setFilter('created')
+                setCurrentPage(1)
+              }}
+            >
+              Created by Me
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            size="small"
-            layout={filter === 'all' ? 'primary' : 'outline'}
-            onClick={() => {
-              setFilter('all')
-              setCurrentPage(1)
-            }}
-          >
-            All
-          </Button>
-          <Button
-            size="small"
-            layout={filter === 'assigned' ? 'primary' : 'outline'}
-            onClick={() => {
-              setFilter('assigned')
-              setCurrentPage(1)
-            }}
-          >
-            Assigned to Me
-          </Button>
-          <Button
-            size="small"
-            layout={filter === 'created' ? 'primary' : 'outline'}
-            onClick={() => {
-              setFilter('created')
-              setCurrentPage(1)
-            }}
-          >
-            Created by Me
-          </Button>
+
+        {/* Advanced Filters */}
+        <div className="flex flex-col sm:flex-row gap-4 items-end">
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Label>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Status</span>
+              <Select
+                className="mt-1"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as TaskStatus | 'all')
+                  setCurrentPage(1)
+                }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="rescheduling">Rescheduling</option>
+                <option value="completed">Completed</option>
+                <option value="not_applicable">Not Applicable</option>
+              </Select>
+            </Label>
+
+            <Label>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Priority</span>
+              <Select
+                className="mt-1"
+                value={priorityFilter}
+                onChange={(e) => {
+                  setPriorityFilter(e.target.value as TaskPriority | 'all')
+                  setCurrentPage(1)
+                }}
+              >
+                <option value="all">All Priorities</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </Select>
+            </Label>
+
+            <Label>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Due Date</span>
+              <Select
+                className="mt-1"
+                value={dueDateFilter}
+                onChange={(e) => {
+                  setDueDateFilter(e.target.value as typeof dueDateFilter)
+                  setCurrentPage(1)
+                }}
+              >
+                <option value="all">All Due Dates</option>
+                <option value="overdue">Overdue</option>
+                <option value="today">Today</option>
+                <option value="this_week">This Week</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="no_due_date">No Due Date</option>
+              </Select>
+            </Label>
+
+            <Label>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Assigned To</span>
+              <Select
+                className="mt-1"
+                value={assignedToFilter}
+                onChange={(e) => {
+                  setAssignedToFilter(e.target.value)
+                  setCurrentPage(1)
+                }}
+              >
+                <option value="all">All Users</option>
+                {availableUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.full_name || user.email}
+                  </option>
+                ))}
+              </Select>
+            </Label>
+          </div>
+
+          {hasActiveFilters() && (
+            <Button
+              size="small"
+              layout="outline"
+              onClick={clearFilters}
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
       </div>
 
@@ -615,7 +818,7 @@ function TasksPage() {
       ) : filteredTasks.length === 0 ? (
         <Card>
           <div className="p-6 text-center text-gray-500">
-            {searchQuery ? 'No tasks match your search' : 'No tasks found'}
+            {hasActiveFilters() ? 'No tasks match your filters' : 'No tasks found'}
           </div>
         </Card>
       ) : (
