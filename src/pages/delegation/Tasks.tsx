@@ -874,14 +874,6 @@ function TasksPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Badge type={getStatusColor(task.status)}>{task.status}</Badge>
-                              {(() => {
-                                const overdueDisplay = getOverdueDisplay(task)
-                                return overdueDisplay && (
-                                  <Badge type="danger" className="text-xs font-semibold">
-                                    {overdueDisplay}
-                                  </Badge>
-                                )
-                              })()}
                             </div>
                           </td>
                           <td className="px-4 py-3 hidden md:table-cell">

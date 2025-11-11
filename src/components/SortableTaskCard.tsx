@@ -50,11 +50,6 @@ function SortableTaskCard({
         <div className="flex gap-2 mt-2">
           <Badge type={getStatusColor(task.status)}>{task.status}</Badge>
           <Badge>{task.priority}</Badge>
-          {overdueDisplay && (
-            <Badge type="danger" className="text-xs">
-              {overdueDisplay}
-            </Badge>
-          )}
         </div>
         {task.due_date && (
           <div className="mt-2">
