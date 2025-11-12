@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useToastContext } from '@/context/ToastContext'
 import { supabase } from '@/lib/supabase'
 import { Task } from '@/types'
 import { Button, Label, Input } from '@roketid/windmill-react-ui'
+import { calculateCanCompleteAfter, canCompleteTask } from '@/lib/taskUtils'
 import Modal from './Modal'
 
 interface CompleteTaskModalProps {
@@ -20,7 +21,29 @@ function CompleteTaskModal({ isOpen, onClose, onSuccess, task }: CompleteTaskMod
   const [uploading, setUploading] = useState(false)
   const [completionNotes, setCompletionNotes] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [canComplete, setCanComplete] = useState(true)
+  const [canCompleteAfter, setCanCompleteAfter] = useState<Date | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (task && isOpen) {
+      checkCompletionUnlock()
+    }
+  }, [task, isOpen])
+
+  const checkCompletionUnlock = async () => {
+    if (!task) return
+
+    const canCompleteNow = await canCompleteTask(task)
+    setCanComplete(canCompleteNow)
+
+    if (!canCompleteNow) {
+      const unlockDate = await calculateCanCompleteAfter(task)
+      setCanCompleteAfter(unlockDate)
+    } else {
+      setCanCompleteAfter(null)
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -83,6 +106,16 @@ function CompleteTaskModal({ isOpen, onClose, onSuccess, task }: CompleteTaskMod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!task || !appUser) return
+
+    // Check if task can be completed (unlock logic)
+    if (!canComplete) {
+      if (canCompleteAfter) {
+        toast.error(`You can complete this task after ${canCompleteAfter.toLocaleDateString()}`)
+      } else {
+        toast.error('This task cannot be completed yet')
+      }
+      return
+    }
 
     // Validate attachment requirement
     if (task.attachment_required && !selectedFile) {
@@ -154,6 +187,13 @@ function CompleteTaskModal({ isOpen, onClose, onSuccess, task }: CompleteTaskMod
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Task: {task.title}
           </h4>
+          {!canComplete && canCompleteAfter && (
+            <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+              <p className="text-sm text-red-800 dark:text-red-200 font-semibold">
+                ⚠️ You can complete this task after {canCompleteAfter.toLocaleDateString()} {canCompleteAfter.toLocaleTimeString()}.
+              </p>
+            </div>
+          )}
           {task.attachment_required && (
             <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
@@ -205,7 +245,7 @@ function CompleteTaskModal({ isOpen, onClose, onSuccess, task }: CompleteTaskMod
           <Button layout="outline" type="button" onClick={handleClose} disabled={loading || uploading}>
             Cancel
           </Button>
-          <Button type="submit" disabled={loading || uploading}>
+          <Button type="submit" disabled={loading || uploading || !canComplete}>
             {uploading ? 'Uploading...' : loading ? 'Completing...' : 'Mark Complete'}
           </Button>
         </div>

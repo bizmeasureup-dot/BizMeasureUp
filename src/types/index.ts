@@ -70,6 +70,7 @@ export interface Task {
   attachment_required: boolean
   completion_attachment_url?: string
   completion_notes?: string
+  recurring_template_id?: string
   created_at: string
   updated_at: string
 }
@@ -128,6 +129,36 @@ export interface FlowView {
   created_by: string
   created_at: string
   updated_at: string
+}
+
+// Recurring Task Types
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'
+
+export interface RecurringTaskTemplate {
+  id: string
+  organization_id: string
+  title: string
+  description?: string
+  assigned_to: string
+  created_by: string
+  priority: TaskPriority
+  attachment_required: boolean
+  recurrence_type: RecurrenceType
+  recurrence_interval: number
+  recurrence_day_of_week?: number
+  recurrence_day_of_month?: number
+  recurrence_month?: number
+  start_date: string
+  end_date?: string
+  unlock_days_before_due: number
+  is_paused: boolean
+  is_ended: boolean
+  next_task_due_date?: string
+  last_generated_task_id?: string
+  created_at: string
+  updated_at: string
+  // Joined fields
+  last_generated_task?: Task
 }
 
 // Task History Types

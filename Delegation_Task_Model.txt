@@ -1,0 +1,667 @@
+================================================================================
+DELEGATION TASK MODEL - COMPLETE STRUCTURE
+================================================================================
+
+TABLE OF CONTENTS:
+1. Task Interface (TypeScript)
+2. Database Schema (PostgreSQL)
+3. Related Models
+4. Enums and Types
+5. Relationships
+6. Database Functions and Triggers
+7. Row Level Security Policies
+
+================================================================================
+1. TASK INTERFACE (TypeScript)
+================================================================================
+
+Location: src/types/index.ts
+
+export interface Task {
+  id: string                                    // UUID, Primary Key
+  organization_id: string                       // UUID, Foreign Key -> organizations.id
+  title: string                                 // TEXT, Required
+  description?: string                          // TEXT, Optional
+  assigned_to: string                          // UUID, Foreign Key -> users.id, Required
+  created_by: string                           // UUID, Foreign Key -> users.id, Required
+  status: TaskStatus                            // Enum: 'pending' | 'rescheduling' | 'completed' | 'not_applicable'
+  priority: TaskPriority                        // Enum: 'low' | 'medium' | 'high' | 'urgent'
+  due_date?: string                            // TIMESTAMP WITH TIME ZONE, Optional
+  original_due_date?: string                   // TIMESTAMP WITH TIME ZONE, Optional (set on creation, protected)
+  completed_at?: string                         // TIMESTAMP WITH TIME ZONE, Optional
+  attachment_required: boolean                 // BOOLEAN, Default: false
+  completion_attachment_url?: string            // TEXT, Optional
+  completion_notes?: string                     // TEXT, Optional
+  created_at: string                           // TIMESTAMP WITH TIME ZONE, Auto-generated
+  updated_at: string                           // TIMESTAMP WITH TIME ZONE, Auto-updated
+}
+
+================================================================================
+2. DATABASE SCHEMA (PostgreSQL)
+================================================================================
+
+Table Name: public.tasks
+
+Column Definitions:
+-------------------
+id                          UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+organization_id             UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE
+title                       TEXT NOT NULL
+description                 TEXT
+assigned_to                 UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT
+created_by                  UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT
+status                      task_status NOT NULL DEFAULT 'pending'
+priority                    task_priority NOT NULL DEFAULT 'medium'
+due_date                    TIMESTAMP WITH TIME ZONE
+original_due_date           TIMESTAMP WITH TIME ZONE (added via migration)
+completed_at                TIMESTAMP WITH TIME ZONE
+attachment_required         BOOLEAN NOT NULL DEFAULT FALSE (added via migration)
+completion_attachment_url   TEXT (added via migration)
+completion_notes            TEXT (added via migration)
+created_at                  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+updated_at                  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+
+Indexes:
+--------
+idx_tasks_organization_id    ON public.tasks(organization_id)
+idx_tasks_assigned_to       ON public.tasks(assigned_to)
+idx_tasks_status            ON public.tasks(status)
+
+Triggers:
+---------
+update_tasks_updated_at      BEFORE UPDATE - Auto-updates updated_at timestamp
+set_original_due_date_trigger BEFORE INSERT - Sets original_due_date = due_date on creation
+protect_original_due_date_trigger BEFORE UPDATE - Prevents modification of original_due_date after it's set
+
+================================================================================
+3. RELATED MODELS
+================================================================================
+
+3.1 RESCHEDULE REQUEST MODEL
+----------------------------
+Table Name: public.ask_reschedule_requests
+
+export interface RescheduleRequest {
+  id: string                                    // UUID, Primary Key
+  task_id: string                              // UUID, Foreign Key -> tasks.id
+  requested_by: string                         // UUID, Foreign Key -> users.id
+  requested_due_date: string                   // TIMESTAMP WITH TIME ZONE, Required
+  current_due_date?: string                    // TIMESTAMP WITH TIME ZONE, Optional
+  status: RescheduleRequestStatus              // 'pending' | 'approved' | 'rejected'
+  approved_by?: string                         // UUID, Foreign Key -> users.id
+  approved_at?: string                         // TIMESTAMP WITH TIME ZONE
+  rejected_by?: string                         // UUID, Foreign Key -> users.id
+  rejected_at?: string                         // TIMESTAMP WITH TIME ZONE
+  rejection_reason?: string                    // TEXT
+  expires_at: string                          // TIMESTAMP WITH TIME ZONE, Required
+  created_at: string                          // TIMESTAMP WITH TIME ZONE
+  updated_at: string                          // TIMESTAMP WITH TIME ZONE
+  // Joined fields (optional)
+  task?: Task
+  requester?: User
+  approver?: User
+  rejector?: User
+}
+
+Database Columns:
+-----------------
+id                          UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+task_id                     UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE
+requested_by                UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT
+requested_due_date          TIMESTAMP WITH TIME ZONE NOT NULL
+current_due_date            TIMESTAMP WITH TIME ZONE
+status                      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected'))
+approved_by                 UUID REFERENCES public.users(id) ON DELETE SET NULL
+approved_at                 TIMESTAMP WITH TIME ZONE
+rejected_by                 UUID REFERENCES public.users(id) ON DELETE SET NULL
+rejected_at                 TIMESTAMP WITH TIME ZONE
+rejection_reason            TEXT
+expires_at                  TIMESTAMP WITH TIME ZONE NOT NULL
+created_at                  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+updated_at                  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+
+Indexes:
+--------
+idx_ask_reschedule_requests_task_id        ON public.ask_reschedule_requests(task_id)
+idx_ask_reschedule_requests_requested_by    ON public.ask_reschedule_requests(requested_by)
+idx_ask_reschedule_requests_status          ON public.ask_reschedule_requests(status)
+idx_ask_reschedule_requests_expires_at      ON public.ask_reschedule_requests(expires_at)
+idx_ask_reschedule_requests_pending         ON public.ask_reschedule_requests(status, expires_at) WHERE status = 'pending'
+
+Triggers:
+---------
+trigger_update_task_status_on_reschedule_request    AFTER INSERT - Sets task status to 'rescheduling' when request created
+trigger_update_task_status_on_reschedule_resolution  AFTER UPDATE - Reverts task status to 'pending' when all requests resolved
+update_ask_reschedule_requests_updated_at            BEFORE UPDATE - Auto-updates updated_at timestamp
+
+3.2 TASK HISTORY MODEL
+----------------------
+Table Name: public.ask_history
+
+export interface TaskHistory {
+  id: string                                    // UUID, Primary Key
+  task_id: string                              // UUID, Foreign Key -> tasks.id
+  changed_by: string                           // UUID, Foreign Key -> users.id
+  change_type: TaskHistoryChangeType           // 'status' | 'assignment' | 'due_date' | 'reschedule_request'
+  old_value?: Record<string, any>              // JSONB, Optional
+  new_value?: Record<string, any>              // JSONB, Optional
+  metadata?: Record<string, any>               // JSONB, Optional
+  created_at: string                          // TIMESTAMP WITH TIME ZONE
+  // Joined fields (optional)
+  changed_by_user?: User
+}
+
+Database Columns:
+-----------------
+id                          UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+task_id                     UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE
+changed_by                  UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT
+change_type                 task_history_change_type NOT NULL
+old_value                   JSONB
+new_value                   JSONB
+metadata                    JSONB
+created_at                  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+
+Indexes:
+--------
+idx_ask_history_task_id      ON public.ask_history(task_id)
+idx_ask_history_created_at   ON public.ask_history(created_at)
+idx_ask_history_changed_by   ON public.ask_history(changed_by)
+
+Triggers:
+---------
+task_changes_trigger         AFTER UPDATE ON tasks - Automatically logs status, assignment, and due_date changes
+
+================================================================================
+4. ENUMS AND TYPES
+================================================================================
+
+4.1 TaskStatus Enum
+-------------------
+Type: task_status (PostgreSQL ENUM)
+TypeScript: type TaskStatus = 'pending' | 'rescheduling' | 'completed' | 'not_applicable'
+
+Values:
+  - 'pending'         - Task is pending completion
+  - 'rescheduling'    - Task has pending reschedule requests
+  - 'completed'       - Task has been completed
+  - 'not_applicable'  - Task is marked as not applicable
+
+Note: Legacy values 'in_progress' and 'cancelled' were migrated to 'pending' and 'not_applicable' respectively.
+
+4.2 TaskPriority Enum
+---------------------
+Type: task_priority (PostgreSQL ENUM)
+TypeScript: type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
+
+Values:
+  - 'low'     - Low priority task
+  - 'medium'  - Medium priority task (default)
+  - 'high'    - High priority task
+  - 'urgent'  - Urgent priority task
+
+4.3 RescheduleRequestStatus
+---------------------------
+TypeScript: type RescheduleRequestStatus = 'pending' | 'approved' | 'rejected'
+
+Values:
+  - 'pending'   - Request is awaiting approval/rejection
+  - 'approved'  - Request has been approved
+  - 'rejected'  - Request has been rejected
+
+4.4 TaskHistoryChangeType
+-------------------------
+Type: task_history_change_type (PostgreSQL ENUM)
+TypeScript: type TaskHistoryChangeType = 'status' | 'assignment' | 'due_date' | 'reschedule_request'
+
+Values:
+  - 'status'            - Task status was changed
+  - 'assignment'        - Task assignment was changed
+  - 'due_date'          - Task due date was changed
+  - 'reschedule_request' - Reschedule request was approved/rejected
+
+================================================================================
+5. RELATIONSHIPS
+================================================================================
+
+Task Relationships:
+-------------------
+1. Task -> Organization (Many-to-One)
+   - organization_id references organizations.id
+   - Cascade delete: When organization is deleted, all tasks are deleted
+
+2. Task -> User (Assigned To) (Many-to-One)
+   - assigned_to references users.id
+   - Restrict delete: Cannot delete user if they have assigned tasks
+
+3. Task -> User (Created By) (Many-to-One)
+   - created_by references users.id
+   - Restrict delete: Cannot delete user if they created tasks
+
+4. Task -> RescheduleRequest (One-to-Many)
+   - ask_reschedule_requests.task_id references tasks.id
+   - Cascade delete: When task is deleted, all reschedule requests are deleted
+
+5. Task -> TaskHistory (One-to-Many)
+   - ask_history.task_id references tasks.id
+   - Cascade delete: When task is deleted, all history entries are deleted
+
+RescheduleRequest Relationships:
+--------------------------------
+1. RescheduleRequest -> Task (Many-to-One)
+   - task_id references tasks.id
+
+2. RescheduleRequest -> User (Requested By) (Many-to-One)
+   - requested_by references users.id
+
+3. RescheduleRequest -> User (Approved By) (Many-to-One, Optional)
+   - approved_by references users.id
+
+4. RescheduleRequest -> User (Rejected By) (Many-to-One, Optional)
+   - rejected_by references users.id
+
+TaskHistory Relationships:
+--------------------------
+1. TaskHistory -> Task (Many-to-One)
+   - task_id references tasks.id
+
+2. TaskHistory -> User (Changed By) (Many-to-One)
+   - changed_by references users.id
+
+================================================================================
+6. DATABASE FUNCTIONS AND TRIGGERS
+================================================================================
+
+6.1 Task Functions
+------------------
+
+Function: set_original_due_date_on_insert()
+Purpose: Automatically sets original_due_date = due_date when a task is created
+Trigger: set_original_due_date_trigger (BEFORE INSERT)
+
+Function: protect_original_due_date()
+Purpose: Prevents modification of original_due_date after it's been set
+Trigger: protect_original_due_date_trigger (BEFORE UPDATE)
+
+Function: update_updated_at_column()
+Purpose: Auto-updates updated_at timestamp on any update
+Trigger: update_tasks_updated_at (BEFORE UPDATE)
+
+Function: log_task_changes()
+Purpose: Automatically logs task changes (status, assignment, due_date) to history
+Trigger: task_changes_trigger (AFTER UPDATE)
+
+6.2 Reschedule Request Functions
+---------------------------------
+
+Function: approve_reschedule_request(request_id UUID)
+Purpose: Approves a reschedule request and updates task due_date
+Returns: BOOLEAN
+Security: SECURITY DEFINER (runs with postgres privileges)
+Side Effects:
+  - Updates request status to 'approved'
+  - Sets approved_by and approved_at
+  - Updates task.due_date to requested_due_date
+  - Logs history entry via log_reschedule_request_history()
+
+Function: reject_reschedule_request(request_id UUID, reason TEXT)
+Purpose: Rejects a reschedule request
+Returns: BOOLEAN
+Security: SECURITY DEFINER
+Side Effects:
+  - Updates request status to 'rejected'
+  - Sets rejected_by, rejected_at, and rejection_reason
+  - Logs history entry via log_reschedule_request_history()
+
+Function: auto_approve_expired_reschedule_requests()
+Purpose: Automatically approves expired reschedule requests
+Returns: INTEGER (count of approved requests)
+Security: SECURITY DEFINER
+Side Effects:
+  - Updates expired requests to 'approved'
+  - Updates task due_dates accordingly
+
+Function: update_task_status_on_reschedule_request()
+Purpose: Sets task status to 'rescheduling' when a pending request is created
+Trigger: trigger_update_task_status_on_reschedule_request (AFTER INSERT)
+
+Function: update_task_status_on_reschedule_resolution()
+Purpose: Reverts task status to 'pending' when all requests are resolved
+Trigger: trigger_update_task_status_on_reschedule_resolution (AFTER UPDATE)
+
+6.3 History Functions
+---------------------
+
+Function: log_task_history(
+  p_task_id UUID,
+  p_changed_by UUID,
+  p_change_type task_history_change_type,
+  p_old_value JSONB DEFAULT NULL,
+  p_new_value JSONB DEFAULT NULL,
+  p_metadata JSONB DEFAULT NULL
+)
+Purpose: Creates a history entry for a task change
+Returns: UUID (history entry id)
+Security: SECURITY DEFINER
+
+Function: log_reschedule_request_history(
+  p_request_id UUID,
+  p_action TEXT
+)
+Purpose: Logs history when a reschedule request is approved or rejected
+Returns: UUID (history entry id)
+Security: SECURITY DEFINER
+
+================================================================================
+7. ROW LEVEL SECURITY (RLS) POLICIES
+================================================================================
+
+7.1 Tasks Table Policies
+------------------------
+
+Policy: "Users can view tasks in their organizations"
+Type: SELECT
+Condition: User must be a member of the task's organization
+
+Policy: "Doers can view assigned tasks"
+Type: SELECT
+Condition: User is assigned to the task (assigned_to = auth.uid())
+
+Policy: "Admins and owners can create tasks"
+Type: INSERT
+Condition: User must be admin or owner in the organization
+
+Policy: "Admins can update any task"
+Type: UPDATE
+Condition: User must be admin in the organization
+
+Policy: "Owners can update tasks"
+Type: UPDATE
+Condition: User must be owner in the organization
+
+Policy: "Doers can update assigned tasks"
+Type: UPDATE
+Condition: User is assigned to the task (assigned_to = auth.uid())
+
+Policy: "Admins can delete tasks"
+Type: DELETE
+Condition: User must be admin in the organization
+
+7.2 Reschedule Requests Policies
+--------------------------------
+
+Policy: "Users can view reschedule requests for their tasks"
+Type: SELECT
+Condition: 
+  - User created the task, OR
+  - User is admin/owner in the organization, OR
+  - User requested the reschedule
+
+Policy: "Users can create reschedule requests"
+Type: INSERT
+Condition: 
+  - User is a member of the task's organization, AND
+  - User is the requester (requested_by = auth.uid())
+
+Policy: "Task creators and admins can approve/reject requests"
+Type: UPDATE
+Condition:
+  - User created the task, OR
+  - User is admin/owner in the organization
+
+7.3 Task History Policies
+--------------------------
+
+Policy: "Users can view task history in their organizations"
+Type: SELECT
+Condition:
+  - User is a member of the task's organization, OR
+  - User is assigned to the task
+
+Policy: "System can insert task history"
+Type: INSERT
+Condition: true (allows system functions to log history)
+
+================================================================================
+8. BUSINESS LOGIC AND WORKFLOWS
+================================================================================
+
+8.1 Task Creation Workflow
+--------------------------
+1. Task is created with required fields (title, assigned_to, created_by, organization_id)
+2. original_due_date is automatically set to due_date (if provided) via trigger
+3. Status defaults to 'pending'
+4. Priority defaults to 'medium'
+5. attachment_required defaults to false
+
+8.2 Task Completion Workflow
+-----------------------------
+1. User marks task as 'completed'
+2. completed_at timestamp is set
+3. If attachment_required is true, completion_attachment_url must be provided
+4. completion_notes can be optionally added
+5. History entry is logged via trigger
+
+8.3 Reschedule Request Workflow
+-------------------------------
+1. User creates reschedule request with requested_due_date and expires_at
+2. Task status automatically changes to 'rescheduling' via trigger
+3. Request status is 'pending'
+4. Task creator or admin/owner can approve or reject
+5. On approval:
+   - Task due_date is updated to requested_due_date
+   - Request status becomes 'approved'
+   - History entry is logged
+6. On rejection:
+   - Task due_date remains unchanged
+   - Request status becomes 'rejected'
+   - History entry is logged
+7. If all pending requests are resolved, task status reverts to 'pending' via trigger
+8. Expired requests are auto-approved (via scheduled function)
+
+8.4 Task Status Transitions
+---------------------------
+Valid transitions:
+  - pending -> rescheduling (when reschedule request created)
+  - rescheduling -> pending (when all requests resolved)
+  - pending -> completed (when task completed)
+  - pending -> not_applicable (when marked as N/A)
+  - rescheduling -> completed (can complete even with pending requests)
+  - rescheduling -> not_applicable (can mark N/A even with pending requests)
+
+Invalid transitions:
+  - completed -> any other status (completed is terminal)
+  - not_applicable -> any other status (not_applicable is terminal)
+
+8.5 History Logging
+-------------------
+Automatic logging occurs for:
+  - Status changes (via task_changes_trigger)
+  - Assignment changes (via task_changes_trigger)
+  - Due date changes (via task_changes_trigger)
+  - Reschedule request approvals/rejections (via function calls)
+
+History entries include:
+  - change_type: Type of change
+  - old_value: Previous state (JSONB)
+  - new_value: New state (JSONB)
+  - metadata: Additional context (JSONB)
+  - changed_by: User who made the change
+  - created_at: Timestamp of change
+
+================================================================================
+9. FIELD DESCRIPTIONS
+================================================================================
+
+id
+  Type: UUID
+  Description: Unique identifier for the task
+  Auto-generated: Yes (uuid_generate_v4())
+
+organization_id
+  Type: UUID
+  Description: Organization this task belongs to
+  Required: Yes
+  Foreign Key: organizations.id
+  Cascade Delete: Yes
+
+title
+  Type: TEXT
+  Description: Task title/name
+  Required: Yes
+  Max Length: None
+
+description
+  Type: TEXT
+  Description: Detailed description of the task
+  Required: No
+  Max Length: None
+
+assigned_to
+  Type: UUID
+  Description: User assigned to complete this task
+  Required: Yes
+  Foreign Key: users.id
+  Restrict Delete: Yes (cannot delete user with assigned tasks)
+
+created_by
+  Type: UUID
+  Description: User who created this task
+  Required: Yes
+  Foreign Key: users.id
+  Restrict Delete: Yes (cannot delete user who created tasks)
+
+status
+  Type: task_status ENUM
+  Description: Current status of the task
+  Required: Yes
+  Default: 'pending'
+  Values: 'pending', 'rescheduling', 'completed', 'not_applicable'
+
+priority
+  Type: task_priority ENUM
+  Description: Priority level of the task
+  Required: Yes
+  Default: 'medium'
+  Values: 'low', 'medium', 'high', 'urgent'
+
+due_date
+  Type: TIMESTAMP WITH TIME ZONE
+  Description: Date and time when task is due
+  Required: No
+  Can be updated: Yes
+  Notes: Can be changed via reschedule requests
+
+original_due_date
+  Type: TIMESTAMP WITH TIME ZONE
+  Description: Original due date when task was created
+  Required: No
+  Can be updated: No (protected by trigger)
+  Notes: Set automatically on creation, preserved for tracking
+
+completed_at
+  Type: TIMESTAMP WITH TIME ZONE
+  Description: Timestamp when task was marked as completed
+  Required: No
+  Set automatically: Yes (when status changes to 'completed')
+
+attachment_required
+  Type: BOOLEAN
+  Description: Whether an attachment is required to complete the task
+  Required: Yes
+  Default: false
+  Notes: If true, completion_attachment_url must be provided when completing
+
+completion_attachment_url
+  Type: TEXT
+  Description: URL to attachment file uploaded when task was completed
+  Required: No
+  Notes: Only relevant if attachment_required is true
+
+completion_notes
+  Type: TEXT
+  Description: Notes added when the task was marked as complete
+  Required: No
+  Max Length: None
+
+created_at
+  Type: TIMESTAMP WITH TIME ZONE
+  Description: Timestamp when task was created
+  Required: Yes
+  Auto-generated: Yes (TIMEZONE('utc', NOW()))
+
+updated_at
+  Type: TIMESTAMP WITH TIME ZONE
+  Description: Timestamp when task was last updated
+  Required: Yes
+  Auto-updated: Yes (via trigger)
+
+================================================================================
+10. USAGE EXAMPLES
+================================================================================
+
+10.1 Creating a Task
+--------------------
+INSERT INTO public.tasks (
+  organization_id,
+  title,
+  description,
+  assigned_to,
+  created_by,
+  status,
+  priority,
+  due_date,
+  attachment_required
+) VALUES (
+  'org-uuid',
+  'Complete project documentation',
+  'Write comprehensive documentation for the project',
+  'user-uuid',
+  'creator-uuid',
+  'pending',
+  'high',
+  '2024-12-31 23:59:59+00',
+  false
+);
+
+10.2 Updating Task Status
+-------------------------
+UPDATE public.tasks
+SET status = 'completed',
+    completed_at = TIMEZONE('utc', NOW())
+WHERE id = 'task-uuid';
+
+10.3 Creating a Reschedule Request
+----------------------------------
+INSERT INTO public.ask_reschedule_requests (
+  task_id,
+  requested_by,
+  requested_due_date,
+  current_due_date,
+  expires_at
+) VALUES (
+  'task-uuid',
+  'user-uuid',
+  '2025-01-15 23:59:59+00',
+  (SELECT due_date FROM public.tasks WHERE id = 'task-uuid'),
+  '2024-12-20 23:59:59+00'
+);
+
+10.4 Approving a Reschedule Request
+-----------------------------------
+SELECT approve_reschedule_request('request-uuid');
+
+10.5 Rejecting a Reschedule Request
+------------------------------------
+SELECT reject_reschedule_request('request-uuid', 'Reason for rejection');
+
+10.6 Querying Task History
+---------------------------
+SELECT * FROM public.ask_history
+WHERE task_id = 'task-uuid'
+ORDER BY created_at DESC;
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+

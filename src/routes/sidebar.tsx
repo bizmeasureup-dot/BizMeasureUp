@@ -37,6 +37,11 @@ const routes: IRoute[] = [
     name: 'Delegation',
   },
   {
+    path: '/delegation/recurring-tasks',
+    icon: 'FormsIcon',
+    name: 'Recurring Tasks',
+  },
+  {
     path: '/checklists',
     icon: 'CardsIcon',
     name: 'Checklists',

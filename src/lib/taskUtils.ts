@@ -1,4 +1,83 @@
-import { Task } from '@/types'
+import { Task, RecurringTaskTemplate } from '@/types'
+import { supabase } from './supabase'
+
+/**
+ * Calculates the "can complete after" date for a task based on its recurring template.
+ * Returns null if task is not recurring or has no unlock_days_before_due.
+ */
+export async function calculateCanCompleteAfter(task: Task): Promise<Date | null> {
+  if (!task.recurring_template_id || !task.due_date) {
+    return null
+  }
+
+  try {
+    const { data: template, error } = await supabase
+      .from('recurring_task_templates')
+      .select('unlock_days_before_due')
+      .eq('id', task.recurring_template_id)
+      .single()
+
+    if (error || !template) {
+      return null
+    }
+
+    if (template.unlock_days_before_due === 0) {
+      return null // No unlock restriction
+    }
+
+    const dueDate = new Date(task.due_date)
+    const canCompleteAfter = new Date(dueDate)
+    canCompleteAfter.setDate(canCompleteAfter.getDate() - template.unlock_days_before_due)
+
+    return canCompleteAfter
+  } catch (error) {
+    console.error('Error calculating can complete after:', error)
+    return null
+  }
+}
+
+/**
+ * Checks if a task can be completed now based on unlock_days_before_due.
+ */
+export async function canCompleteTask(task: Task): Promise<boolean> {
+  if (!task.recurring_template_id) {
+    return true // Non-recurring tasks can always be completed
+  }
+
+  const canCompleteAfter = await calculateCanCompleteAfter(task)
+  if (canCompleteAfter === null) {
+    return true // No unlock restriction
+  }
+
+  const now = new Date()
+  return now >= canCompleteAfter
+}
+
+/**
+ * Gets recurring task template info for a task.
+ */
+export async function getRecurringTaskInfo(task: Task): Promise<RecurringTaskTemplate | null> {
+  if (!task.recurring_template_id) {
+    return null
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('recurring_task_templates')
+      .select('*')
+      .eq('id', task.recurring_template_id)
+      .single()
+
+    if (error || !data) {
+      return null
+    }
+
+    return data as RecurringTaskTemplate
+  } catch (error) {
+    console.error('Error fetching recurring task info:', error)
+    return null
+  }
+}
 
 /**
  * Calculates the number of days a task is overdue based on the original due date.

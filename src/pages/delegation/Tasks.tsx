@@ -16,9 +16,12 @@ import RescheduleTaskModal from '@/components/RescheduleTaskModal'
 import ApprovalCard from '@/components/ApprovalCard'
 import { useTaskHistory } from '@/hooks/useTaskHistory'
 import { useRescheduleRequests } from '@/hooks/useRescheduleRequests'
+import { useRecurringTaskTemplate, pauseRecurringTask, resumeRecurringTask, endRecurringTask } from '@/hooks/useRecurringTasks'
 import { motion, AnimatePresence } from 'framer-motion'
 import { hasPermission } from '@/lib/rbac'
 import { getOverdueDisplay, isTaskOverdue } from '@/lib/taskUtils'
+import { formatRecurrenceDescription, getRecurringTemplateStatus } from '@/lib/recurringTaskUtils'
+import RecurringTaskHistoryModal from '@/components/RecurringTaskHistoryModal'
 
 interface ExpandedTaskDetailsProps {
   task: Task
@@ -30,6 +33,7 @@ interface ExpandedTaskDetailsProps {
   formatHistoryEntry: (entry: TaskHistory) => React.ReactNode
   getUserName: (userId: string | undefined) => string
   setHistoryUserMap: React.Dispatch<React.SetStateAction<Map<string, User>>>
+  appUser: User | null
 }
 
 function ExpandedTaskDetails({
@@ -42,13 +46,61 @@ function ExpandedTaskDetails({
   formatHistoryEntry,
   getUserName,
   setHistoryUserMap,
+  appUser,
 }: ExpandedTaskDetailsProps) {
   const { history, loading: historyLoading, refetch: refetchHistory } = useTaskHistory(task.id)
   const { requests, refetch: refetchRequests, approveRequest, rejectRequest } = useRescheduleRequests({
     taskId: task.id,
   })
+  const { template: recurringTemplate, refetch: refetchTemplate } = useRecurringTaskTemplate(task.recurring_template_id || null)
+  const [viewingHistory, setViewingHistory] = useState(false)
+  const toast = useToastContext()
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
+
+  const canManageRecurring = recurringTemplate && appUser && (
+    recurringTemplate.created_by === appUser.id ||
+    hasPermission(appUser.role, 'tasks.edit')
+  )
+
+  const handlePauseRecurring = async () => {
+    if (!recurringTemplate) return
+    const result = await pauseRecurringTask(recurringTemplate.id)
+    if (result.success) {
+      toast.success('Recurring task paused')
+      refetchTemplate()
+      onRefetch()
+    } else {
+      toast.error(result.error || 'Failed to pause recurring task')
+    }
+  }
+
+  const handleResumeRecurring = async () => {
+    if (!recurringTemplate) return
+    const result = await resumeRecurringTask(recurringTemplate.id)
+    if (result.success) {
+      toast.success('Recurring task resumed')
+      refetchTemplate()
+      onRefetch()
+    } else {
+      toast.error(result.error || 'Failed to resume recurring task')
+    }
+  }
+
+  const handleEndRecurring = async () => {
+    if (!recurringTemplate) return
+    if (!window.confirm('Are you sure you want to end this recurring task series? This action cannot be undone.')) {
+      return
+    }
+    const result = await endRecurringTask(recurringTemplate.id)
+    if (result.success) {
+      toast.success('Recurring task series ended')
+      refetchTemplate()
+      onRefetch()
+    } else {
+      toast.error(result.error || 'Failed to end recurring task')
+    }
+  }
 
   // Update history user map when history changes
   useEffect(() => {
@@ -232,6 +284,62 @@ function ExpandedTaskDetails({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Recurring Task Section */}
+      {recurringTemplate && (
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold text-gray-800 dark:text-gray-200">Recurring Task Series</h4>
+            <Badge type={getRecurringTemplateStatus(recurringTemplate) === 'Active' ? 'success' : getRecurringTemplateStatus(recurringTemplate) === 'Paused' ? 'warning' : 'neutral'}>
+              {getRecurringTemplateStatus(recurringTemplate)}
+            </Badge>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Recurrence: </span>
+              <span className="font-medium">{formatRecurrenceDescription(recurringTemplate)}</span>
+            </div>
+            {recurringTemplate.next_task_due_date && (
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Next Due: </span>
+                <span className="font-medium">{new Date(recurringTemplate.next_task_due_date).toLocaleString()}</span>
+              </div>
+            )}
+            {recurringTemplate.unlock_days_before_due > 0 && (
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Unlock Days: </span>
+                <span className="font-medium">{recurringTemplate.unlock_days_before_due} days before due</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            {canManageRecurring && !recurringTemplate.is_ended && (
+              <>
+                {recurringTemplate.is_paused ? (
+                  <Button size="small" layout="outline" onClick={handleResumeRecurring}>
+                    Resume Series
+                  </Button>
+                ) : (
+                  <Button size="small" layout="outline" onClick={handlePauseRecurring}>
+                    Pause Series
+                  </Button>
+                )}
+                <Button size="small" layout="outline" onClick={handleEndRecurring}>
+                  End Series
+                </Button>
+              </>
+            )}
+            <Button size="small" layout="outline" onClick={() => setViewingHistory(true)}>
+              View History
+            </Button>
+          </div>
+          <RecurringTaskHistoryModal
+            isOpen={viewingHistory}
+            onClose={() => setViewingHistory(false)}
+            templateId={recurringTemplate.id}
+          />
+        </div>
+      )}
 
       {/* Reschedule Requests Section */}
       {pendingRequests.length > 0 && (
@@ -874,6 +982,11 @@ function TasksPage() {
                                 <path d="M9 5l7 7-7 7" />
                               </svg>
                               <span className="font-medium">{task.title}</span>
+                              {task.recurring_template_id && (
+                                <Badge type="primary" className="ml-2">
+                                  Recurring
+                                </Badge>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -970,6 +1083,7 @@ function TasksPage() {
                                       formatHistoryEntry={formatHistoryEntry}
                                       getUserName={getUserName}
                                       setHistoryUserMap={setHistoryUserMap}
+                                      appUser={appUser}
                                     />
                                   </div>
                                 </motion.div>

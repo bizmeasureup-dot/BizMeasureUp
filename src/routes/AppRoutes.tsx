@@ -15,6 +15,7 @@ import DashboardPage from '@/pages/Dashboard'
 // Delegation module
 import TasksPage from '@/pages/delegation/Tasks'
 import EditTaskPage from '@/pages/delegation/EditTask'
+import RecurringTasksPage from '@/pages/delegation/RecurringTasks'
 
 // Checklist module
 import ChecklistsPage from '@/pages/checklists/Checklists'
@@ -93,6 +94,16 @@ function AppRoutes() {
           <ProtectedRoute requiredPermission="tasks.edit">
             <Layout>
               <EditTaskPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/delegation/recurring-tasks"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <RecurringTasksPage />
             </Layout>
           </ProtectedRoute>
         }
