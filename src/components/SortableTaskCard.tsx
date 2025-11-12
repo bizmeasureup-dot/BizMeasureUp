@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Task, TaskStatus } from '@/types'
 import { Card, Badge } from '@roketid/windmill-react-ui'
 import TaskActionsButton from './TaskActionsButton'
-import { getOverdueDisplay } from '@/lib/taskUtils'
+import { getOverdueDisplay, isTaskOverdue } from '@/lib/taskUtils'
 
 interface SortableTaskCardProps {
   task: Task
@@ -39,11 +39,16 @@ function SortableTaskCard({
   }
 
   const overdueDisplay = getOverdueDisplay(task)
+  const isOverdue = isTaskOverdue(task)
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
-        className="p-4 cursor-move hover:shadow-md"
+        className={`p-4 cursor-move hover:shadow-md ${
+          isOverdue
+            ? 'bg-red-50 dark:bg-red-900/20 border-l-4 border-red-600 dark:border-red-500'
+            : ''
+        }`}
         onClick={() => onNavigate(task.id)}
       >
         <h4 className="font-medium text-gray-700 dark:text-gray-200">{task.title}</h4>
@@ -53,11 +58,26 @@ function SortableTaskCard({
         </div>
         {task.due_date && (
           <div className="mt-2">
-            <p className="text-xs text-gray-500">
-              Due: {new Date(task.due_date).toLocaleDateString()}
+            <p className={`text-xs ${isOverdue ? 'font-bold text-red-600 dark:text-red-400' : 'text-gray-500'}`}>
+              <span className="flex items-center gap-1">
+                {isOverdue && (
+                  <svg
+                    className="w-4 h-4 text-red-600 dark:text-red-400"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                )}
+                Due: {new Date(task.due_date).toLocaleDateString()}
+              </span>
             </p>
             {overdueDisplay && (
-              <p className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">
+              <p className="text-xs text-red-600 dark:text-red-400 font-bold mt-1">
                 {overdueDisplay}
               </p>
             )}

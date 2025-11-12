@@ -18,7 +18,7 @@ import { useTaskHistory } from '@/hooks/useTaskHistory'
 import { useRescheduleRequests } from '@/hooks/useRescheduleRequests'
 import { motion, AnimatePresence } from 'framer-motion'
 import { hasPermission } from '@/lib/rbac'
-import { getOverdueDisplay } from '@/lib/taskUtils'
+import { getOverdueDisplay, isTaskOverdue } from '@/lib/taskUtils'
 
 interface ExpandedTaskDetailsProps {
   task: Task
@@ -841,11 +841,16 @@ function TasksPage() {
                     const isExpanded = expandedTaskId === task.id
                     const canEdit = appUser && (hasPermission(appUser.role, 'tasks.edit') || task.assigned_to === appUser.id)
                     const canDelete = appUser && hasPermission(appUser.role, 'tasks.delete')
+                    const isOverdue = isTaskOverdue(task)
                     
                     return (
                       <React.Fragment key={task.id}>
                         <tr
-                          className="text-gray-700 dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          className={`text-gray-700 dark:text-gray-400 cursor-pointer transition-colors ${
+                            isOverdue
+                              ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`}
                           onClick={(e) => {
                             // Don't expand if clicking on Actions button
                             const target = e.target as HTMLElement
@@ -855,7 +860,7 @@ function TasksPage() {
                             toggleExpanded(task.id)
                           }}
                         >
-                          <td className="px-4 py-3">
+                          <td className={`px-4 py-3 ${isOverdue ? 'border-l-4 border-red-600 dark:border-red-500' : ''}`}>
                             <div className="flex items-center">
                               <svg
                                 className={`w-4 h-4 mr-2 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
@@ -885,11 +890,26 @@ function TasksPage() {
                           <td className="px-4 py-3 text-sm hidden lg:table-cell">
                             {task.due_date ? (
                               <div>
-                                <div className="font-medium">{new Date(task.due_date).toLocaleDateString()}</div>
+                                <div className={`font-medium flex items-center gap-1 ${isOverdue ? 'text-red-600 dark:text-red-400 font-bold' : ''}`}>
+                                  {isOverdue && (
+                                    <svg
+                                      className="w-4 h-4 text-red-600 dark:text-red-400"
+                                      fill="none"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                  )}
+                                  {new Date(task.due_date).toLocaleDateString()}
+                                </div>
                                 {(() => {
                                   const overdueDisplay = getOverdueDisplay(task)
                                   return overdueDisplay && (
-                                    <div className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">
+                                    <div className="text-xs text-red-600 dark:text-red-400 font-bold mt-1">
                                       {overdueDisplay}
                                     </div>
                                   )
